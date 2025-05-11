@@ -16,6 +16,7 @@ type ComponentOptions<T = any> = {
 	style?: string | CSSResult;
 	props?: (keyof T)[];
 	context?: ComponentContext;
+	mixinFn?: <T>(clazz: T) => T;
 };
 
 type ComponentContext = {
@@ -72,8 +73,11 @@ export function defineComponent<T, Name extends string>(
 ): ComponentClass<T> {
 	const observedAttributes =
 		options?.props?.map((p) => camelToHyphen(p as string)) || [];
-
-	class FunctionElement extends HTMLElement implements ComponentClass<T> {
+	const mixinFn = options?.mixinFn || ((clazz) => clazz);
+	class FunctionElement
+		extends mixinFn(HTMLElement)
+		implements ComponentClass<T>
+	{
 		private _props: T = {} as T;
 		private sheet: CSSStyleSheet | null = null;
 		private shadow = this.attachShadow({ mode: "open" });
