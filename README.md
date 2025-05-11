@@ -7,7 +7,7 @@
 ### 特性
 
 * 基于 Lit 的渲染层，性能优秀
-* 完整的 Hook 系统：状态管理、生命周期、异步、事件、上下文等
+* 部分常用的 Hook 系统：状态管理、生命周期、异步、事件、上下文等
 * 简单的函数式组件定义：使用 `defineComponent` / `createComponent`
 * 支持 TypeScript，内置类型定义
 * 一键打包多种模块格式：ESM、CJS、UMD
@@ -20,6 +20,8 @@
 npm install lit-fn lit
 # 或者使用 Yarn
 yarn add lit-fn lit
+# 或者使用 PNPM
+pnpm add lit-fn lit
 ```
 
 > 注意：`lit` 为 peerDependency，需要额外安装。
@@ -158,3 +160,41 @@ export declare function createComponent<T>(component: ComponentFn<T>, options?: 
 * **useActionState**: 管理异步动作的 pending 和错误状态。
 
 * **useFormState**: `useActionState` 的表单专用别名。
+
+---
+
+### 最佳实践
+
+先使用`vite`创建`lit`项目再引入`lit-fn`：
+
+```bash
+pnpm create vite my-app --template lit
+cd my-app
+pnpm i lit-fn
+```
+然后在`src/components/my-counter.ts`中定义组件：
+```ts
+import { createComponent } from "lit-fn";
+import { html } from "lit";
+
+export const MyCounter = createComponent((props: { initial?: number }) => {
+  const [count, setCount] = useState(props.initial ?? 0);
+  return html`
+    <button @click=${() => setCount(count + 1)}>
+      点击次数：${count}
+    </button>
+  `;
+}, { props: ["initial"] });
+```
+再`src/main.ts`中注册组件
+```ts
+import { MyCounter } from "./components/my-counter";
+MyCounter.register("my-counter");
+```
+最后在`index.html`中使用组件
+```html
+...
+<script type="module" src="/src/main.ts"></script>
+...
+<my-counter initial="10"></my-counter>
+```
