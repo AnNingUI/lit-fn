@@ -1,0 +1,16 @@
+build
+dist
+node_modules
+pnpm-lock.yaml
+.vscode/*
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+toMe.txt
+*.tgz
+_index.ts
+.cache
