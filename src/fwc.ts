@@ -16,7 +16,9 @@ type ComponentOptions<T = any> = {
 	style?: string | CSSResult;
 	props?: (keyof T)[];
 	context?: ComponentContext;
-	mixinFn?: <T>(clazz: T) => T;
+	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
+		clazz: T
+	) => T;
 };
 
 type ComponentContext = {
