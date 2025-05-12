@@ -174,7 +174,7 @@ pnpm i lit-fn
 ```
 然后在`src/components/my-counter.ts`中定义组件：
 ```ts
-import { createComponent } from "lit-fn";
+import { createComponent, useState } from "lit-fn";
 import { html } from "lit";
 
 export const MyCounter = createComponent((props: { initial?: number }) => {
@@ -197,4 +197,109 @@ MyCounter.register("my-counter");
 <script type="module" src="/src/main.ts"></script>
 ...
 <my-counter initial="10"></my-counter>
+```
+
+### 注意事项
+* **Hooks** 必须在`createComponent`或者`defineComponent`中调用，可以在类组件(在this.render函数中使用，但是不推荐，`lit`提供了对类组件提供了更好的支持)，不能普通的箭头函数组件(或匿名组件)中调用，否则可能无法触发更新。
+错误示范，此外，避免在条件语句或循环中创建 Hooks，以保证每次渲染时 Hook 的调用顺序一致。
+```js
+import { html } from "lit";
+import { createContext, defineComponent, useContext, useState } from "lit-fn";
+
+const ThemeContext = createContext("light");
+
+export const ThemeButton = defineComponent("theme-button", (_) => {
+	const [theme, setTheme] = useState("light");
+
+	return ThemeContext.Provider({
+		value: theme,
+		children: html`
+			<button @click=${() => setTheme(theme === "light" ? "dark" : "light")}>
+				Theme: ${theme}
+			</button>
+		`,
+	});
+});
+
+export const ThemeDisplay = defineComponent("theme-display", (_) => {
+	const theme = useContext(ThemeContext);
+
+	return html`
+		<div>
+			<div>Current theme: ${theme}</div>
+			${counter()}
+		</div>
+	`;
+});
+
+// 匿名组件通过箭头函数构建在 ThemeDisplay 外部
+// 导致Hooks无法识别当前组件导致渲染阻塞
+const counter = () => {
+	const [count, setCount] = useState(0);
+	return html`
+		<div>
+			<h1>Counter</h1>
+			<button @click=${() => setCount(count + 1)}>Increment</button>
+			<p>Count: ${count}</p>
+		</div>
+	`;
+};
+```
+
+正确示范
+```js
+import { html } from "lit";
+import { createContext, defineComponent, useContext, useState } from "lit-fn";
+
+const ThemeContext = createContext("light");
+
+export const ThemeButton = defineComponent("theme-button", (_) => {
+	const [theme, setTheme] = useState("light");
+
+	return ThemeContext.Provider({
+		value: theme,
+		children: html`
+			<button @click=${() => setTheme(theme === "light" ? "dark" : "light")}>
+				Theme: ${theme}
+			</button>
+		`,
+	});
+});
+
+export const ThemeDisplay = defineComponent("theme-display", (_) => {
+	const theme = useContext(ThemeContext);
+  // 匿名组件在 ThemeDisplay 内部构建
+  // 通过箭头函数包裹，可以访问到当前组件的状态，与ThemeDisplay共享状态
+	const counter = () => {
+		const [count, setCount] = useState(0);
+		return html`
+			<div>
+				<h1>Counter</h1>
+				<button @click=${() => setCount(count + 1)}>Increment</button>
+				<p>Count: ${count}</p>
+			</div>
+		`;
+	};
+	return html`
+		<div>
+			<div>Current theme: ${theme}</div>
+			${counter()}
+		</div>
+	`;
+});
+
+
+// 当然也可以用function定义外部的普通函数组件，因为function定义的函数会在执行时获取执行域的this指针，所以可以访问到组件的状态
+function counter() {
+	const [count, setCount] = useState(0);
+	return html`
+		<div>
+			<h1>Counter</h1>
+			<button @click=${() => setCount(count + 1)}>Increment</button>
+			<p>Count: ${count}</p>
+		</div>
+	`;
+}
+
+
 ```

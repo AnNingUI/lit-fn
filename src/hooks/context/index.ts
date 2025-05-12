@@ -1,11 +1,19 @@
+import { TemplateResult } from "lit";
 import { currentContainer, EventBus } from "../core";
 import { useEffect } from "../effect";
 import { useRef } from "../ref";
 import { useState } from "../state";
 
+type ContextChildren = TemplateResult | (() => TemplateResult);
 type Context<T> = {
 	_currentValue: T;
-	Provider: ({ value, children }: { value: T; children: any }) => any;
+	Provider: ({
+		value,
+		children,
+	}: {
+		value: T;
+		children: ContextChildren;
+	}) => TemplateResult;
 	__contextId: string; // 唯一标识符用于事件隔离
 };
 
@@ -28,7 +36,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 				})
 			);
 
-			return children;
+			return typeof children === "function" ? children() : children;
 		},
 	};
 
