@@ -5,31 +5,30 @@ import { useRef } from "../ref";
 import { useState } from "../state";
 
 type ContextChildren = TemplateResult | (() => TemplateResult);
-type Context<T> = {
+interface Context<T> {
 	_currentValue: T;
-	Provider: ({
-		value,
-		children,
-	}: {
-		value: T;
-		children: ContextChildren;
-	}) => TemplateResult;
+	Provider: {
+		(value: T): (children: ContextChildren) => TemplateResult; // 第一种调用方式
+		(props: { value: T; children: ContextChildren }): TemplateResult; // 第二种调用方式
+	};
 	__contextId: string; // 唯一标识符用于事件隔离
-};
-
+}
+let contextCounter = 0;
 /**
  * 创建一个新的上下文对象
  */
 export function createContext<T>(defaultValue: T): Context<T> {
-	const contextId = `context-${Math.random().toString(36).substr(2, 9)}`;
+	const contextId = `context-${++contextCounter}`;
 
-	const context: Context<T> = {
-		_currentValue: defaultValue,
-		__contextId: contextId,
-		Provider: ({ value, children }) => {
+	const provider = (arg: T | { value: T; children: ContextChildren }): any => {
+		if (typeof arg === "object" && "value" in arg! && "children" in arg) {
+			const { value, children } = arg as {
+				value: T;
+				children: ContextChildren;
+			};
+
 			context._currentValue = value;
 
-			// 触发独立事件通知所有监听者
 			window.dispatchEvent(
 				new CustomEvent(`context-update:${contextId}`, {
 					detail: value,
@@ -37,9 +36,30 @@ export function createContext<T>(defaultValue: T): Context<T> {
 			);
 
 			return typeof children === "function" ? children() : children;
-		},
+		} else {
+			const value = arg as T;
+
+			// 设置当前值并触发更新
+			context._currentValue = value;
+
+			window.dispatchEvent(
+				new CustomEvent(`context-update:${contextId}`, {
+					detail: value,
+				})
+			);
+
+			// 返回接受 children 的函数
+			return (children: ContextChildren) => {
+				return typeof children === "function" ? children() : children;
+			};
+		}
 	};
 
+	const context: Context<T> = {
+		_currentValue: defaultValue,
+		__contextId: contextId,
+		Provider: provider as Context<T>["Provider"], // 类型断言确保符合接口
+	};
 	return context;
 }
 
