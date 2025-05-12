@@ -1,6 +1,6 @@
 {
 	"name": "lit-fn",
-	"version": "0.1.2.1",
+	"version": "0.1.2-1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
