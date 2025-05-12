@@ -1,4 +1,4 @@
-## lit-fn
+## lit-fn  [![npm version](https://img.shields.io/npm/v/lit-fn.svg)](https://www.npmjs.com/package/lit-fn) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AnNingUI/lit-fn)
 
 一个基于 Lit 的函数式组件框架，提供类似 React Hooks 的能力，让你可以在 Web Components 中轻松使用 `useState`、`useEffect`、`useMemo` 等 Hooks。
 
