@@ -200,7 +200,7 @@ MyCounter.register("my-counter");
 ```
 
 ### 注意事项
-* **Hooks** 必须在`createComponent`或者`defineComponent`中调用，可以在类组件(在this.render函数中使用，但是不推荐，`lit`提供了对类组件提供了更好的支持)，不能普通的箭头函数组件(或匿名组件)中调用，否则可能无法触发更新。
+* **Hooks** 必须在`createComponent`或者`defineComponent`中调用，可以在类组件(在this.render函数中使用，但是不推荐，`lit`对类组件提供了更好的支持)，不能普通的箭头函数组件(或匿名组件)中调用，否则可能无法触发更新。
 错误示范，此外，避免在条件语句或循环中创建 Hooks，以保证每次渲染时 Hook 的调用顺序一致。
 ```js
 import { html } from "lit";
