@@ -1,4 +1,4 @@
-import { CSSResult, render, TemplateResult } from "lit";
+import { CSSResult, html, render, TemplateResult } from "lit";
 export function injectRerender(fn: () => void) {
 	if (currentContainer) {
 		currentContainer.rerender = fn;
@@ -17,6 +17,7 @@ type ComponentFn<T = any> = (
 
 type ComponentOptions<T = any> = {
 	style?: string | CSSResult;
+	lazy?: boolean;
 	props?: (keyof T)[];
 	context?: ComponentContext;
 	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
@@ -70,7 +71,7 @@ export interface ComponentClass<T> {
 	get tag(): string;
 	get props(): T;
 	lazy<Args extends any[]>(
-		callback: (...args: Args) => TemplateResult
+		callback: () => (...args: Args) => TemplateResult
 	): (...args: Args) => TemplateResult;
 }
 
@@ -82,6 +83,7 @@ export function defineComponent<T, Name extends string>(
 	const observedAttributes =
 		options?.props?.map((p) => camelToHyphen(p as string)) || [];
 	const mixinFn = options?.mixinFn || ((clazz) => clazz);
+
 	class FunctionElement
 		extends mixinFn(HTMLElement)
 		implements ComponentClass<T>
@@ -141,12 +143,24 @@ export function defineComponent<T, Name extends string>(
 			}
 		}
 
-		// 将外部箭头函数的this指向为组件实例this
+		// Uncaught ReferenceError: Cannot access 'counter' before initialization
+		// 用来避免在构造函数中使用 未定义 函数时报错
 		public lazy<Args extends any[]>(
-			callback: (...args: Args) => TemplateResult
+			callback: () => (...args: Args) => TemplateResult
 		) {
+			const _callback = (callback ?? (() => callback)) as () => (
+				...args: Args
+			) => TemplateResult;
+			// 延迟到真正渲染子组件时再调用，并捕获任何运行时错误
 			return (...args: Args) => {
-				return callback.apply(this, args);
+				try {
+					return _callback().apply(this, args);
+				} catch (e) {
+					setTimeout(() => {
+						this.update();
+					}, 0);
+					return html`<!-- lazy component error: ${(e as Error).message} -->`;
+				}
 			};
 		}
 

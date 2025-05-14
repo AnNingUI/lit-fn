@@ -1,0 +1,7 @@
+test/
+docs/
+*.log
+*.tgz
+_index.ts
+pnpm-lock.yaml
+toMe.txt
