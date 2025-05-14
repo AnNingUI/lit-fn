@@ -107,7 +107,7 @@ function counter() {
 ```ts
 export const ThemeDisplay = defineComponent("theme-display", (_, ctx) => {
 	const theme = useContext(ThemeContext);
-	const _counter = ctx.lazy(counter); // 修改外部箭头函数(匿名组件)的this指针指向组件实例
+	const _counter = ctx.lazy(() => counter); // 修改外部箭头函数(匿名组件)在组件实例注册后再导入
 	return html`
 		<div>
 			<div>Current theme: ${theme}</div>

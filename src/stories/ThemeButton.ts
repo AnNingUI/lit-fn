@@ -21,7 +21,7 @@ export const ThemeDisplay = defineComponent("theme-display", (_, ctx) => {
 	return html`
 		<div>
 			<div>Current theme: ${theme}</div>
-			${ctx.lazy(counter)()}
+			${ctx.lazy(() => counter)()}
 		</div>
 	`;
 });

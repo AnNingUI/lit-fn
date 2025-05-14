@@ -4,7 +4,7 @@ import { createComponent } from "../fwc";
 
 export const AppMain = createComponent((_, ctx) => {
 	// 将箭头函数组件的this移动到组件实例上
-	const hc = ctx.lazy(hookCallback);
+	const hc = ctx.lazy(() => hookCallback);
 	return html`
 		<main>
 			${hc(1, 2)}

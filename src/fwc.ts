@@ -71,7 +71,7 @@ export interface ComponentClass<T> {
 	get tag(): string;
 	get props(): T;
 	lazy<Args extends any[]>(
-		callback: (...args: Args) => TemplateResult
+		callback: () => (...args: Args) => TemplateResult
 	): (...args: Args) => TemplateResult;
 }
 
@@ -146,12 +146,15 @@ export function defineComponent<T, Name extends string>(
 		// Uncaught ReferenceError: Cannot access 'counter' before initialization
 		// 用来避免在构造函数中使用 未定义 函数时报错
 		public lazy<Args extends any[]>(
-			callback: (...args: Args) => TemplateResult
+			callback: () => (...args: Args) => TemplateResult
 		) {
+			const _callback = (callback ?? (() => callback)) as () => (
+				...args: Args
+			) => TemplateResult;
 			// 延迟到真正渲染子组件时再调用，并捕获任何运行时错误
 			return (...args: Args) => {
 				try {
-					return callback.apply(this, args);
+					return _callback().apply(this, args);
 				} catch (e) {
 					setTimeout(() => {
 						this.update();
@@ -260,20 +263,18 @@ export function defineComponent<T, Name extends string>(
 			});
 		}
 	}
-	queueMicrotask(() => {
-		if ((tag as TagOptions<Name>)?.extends) {
-			customElements.define(
-				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-				FunctionElement,
-				{ extends: (tag as TagOptions<Name>)?.extends }
-			);
-		} else {
-			customElements.define(
-				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-				FunctionElement
-			);
-		}
-	});
+	if ((tag as TagOptions<Name>)?.extends) {
+		customElements.define(
+			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+			FunctionElement,
+			{ extends: (tag as TagOptions<Name>)?.extends }
+		);
+	} else {
+		customElements.define(
+			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+			FunctionElement
+		);
+	}
 	return FunctionElement as unknown as ComponentClass<T>;
 }
 
