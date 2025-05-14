@@ -10,7 +10,10 @@ export function resetHooks() {
 	currentContainer.currentIndex = 0;
 }
 
-type ComponentFn<T = any> = (props: T) => TemplateResult;
+type ComponentFn<T = any> = (
+	props: T,
+	ctx: ComponentClass<T>
+) => TemplateResult;
 
 type ComponentOptions<T = any> = {
 	style?: string | CSSResult;
@@ -64,8 +67,11 @@ type TagOptions<T extends string> = {
 };
 
 export interface ComponentClass<T> {
-	setProps(newProps: Partial<T>): void;
+	get tag(): string;
 	get props(): T;
+	lazy<Args extends any[]>(
+		callback: (...args: Args) => TemplateResult
+	): (...args: Args) => TemplateResult;
 }
 
 export function defineComponent<T, Name extends string>(
@@ -86,8 +92,12 @@ export function defineComponent<T, Name extends string>(
 		private hookContainer: HookContainer;
 		private __onAdopted!: () => void;
 		private templates: Record<string, HTMLTemplateElement> = {};
-		public static tag: string =
-			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>);
+		get tag() {
+			return (
+				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>)
+			);
+		}
+
 		static get observedAttributes() {
 			return observedAttributes;
 		}
@@ -129,6 +139,15 @@ export function defineComponent<T, Name extends string>(
 			if (this.sheet) {
 				this.shadow.adoptedStyleSheets = [this.sheet];
 			}
+		}
+
+		// 将外部箭头函数的this指向为组件实例this
+		public lazy<Args extends any[]>(
+			callback: (...args: Args) => TemplateResult
+		) {
+			return (...args: Args) => {
+				return callback.apply(this, args);
+			};
 		}
 
 		connectedCallback() {
@@ -218,7 +237,7 @@ export function defineComponent<T, Name extends string>(
 		private update() {
 			withContainer(this.hookContainer, () => {
 				resetHooks();
-				const tpl = component(this.props);
+				const tpl = component(this.props, this);
 				render(tpl, this.shadow);
 				Object.entries(this.templates).forEach(([name, tmpl]) => {
 					const fragment = tmpl.content.cloneNode(true);

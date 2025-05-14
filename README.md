@@ -303,3 +303,27 @@ function counter() {
 
 
 ```
+如果你习惯使用箭头函数（即匿名组件），可以在 `defineComponent` 或 `createComponent` 中通过 `ctx.lazy` 函数导入外部定义的箭头函数组件。该功能自 0.1.4 版本起支持。
+```ts
+export const ThemeDisplay = defineComponent("theme-display", (_, ctx) => {
+	const theme = useContext(ThemeContext);
+	const _counter = ctx.lazy(counter); // 修改外部箭头函数(匿名组件)的this指针指向组件实例
+	return html`
+		<div>
+			<div>Current theme: ${theme}</div>
+			${_counter()}
+		</div>
+	`;
+});
+
+const counter = () => {
+	const [count, setCount] = useState(0);
+	return html`
+		<div>
+			<h1>Counter</h1>
+			<button @click=${() => setCount(count + 1)}>Increment</button>
+			<p>Count: ${count}</p>
+		</div>
+	`;
+};
+```
