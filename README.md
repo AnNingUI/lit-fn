@@ -55,19 +55,34 @@ const MyCounter = defineComponent("my-counter", (props: { initial?: number }) =>
 #### `defineComponent`
 
 ```ts
-function defineComponent<T>(
-  tag: string | { name: string; extends?: string },
-  renderFn: (props: T) => TemplateResult,
-  options?: {
-    style?: string | CSSResult;
+type ComponentFn<T = any> = (props: T, ctx: ComponentContext<T>) => TemplateResult;
+type ComponentOptions<T = any> = {
+    style?: string | CSSResult | CSSResult[] | string[] | (CSSResult | string)[];
     props?: (keyof T)[];
-    context?: { onAdopted?: () => void };
-  }
-): ComponentClass<T>
-
-export declare function createComponent<T>(component: ComponentFn<T>, options?: ComponentOptions<T>): {
-    register: (tag: string | TagOptions) => ComponentClass<T>;
+    mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(clazz: T) => T;
 };
+type LowercaseDashString<T extends string> = T extends `${string}-${string}` ? T extends Lowercase<T> ? T : never : never;
+type TagOptions<T extends string> = {
+    name: LowercaseDashString<T>;
+    extends: keyof HTMLElementTagNameMap;
+};
+export interface ComponentClass<T> {
+    get tag(): string;
+    get props(): T;
+}
+export interface ComponentContext<T> extends ComponentClass<T> {
+    onAdopted: (callback: () => void) => void;
+    lazy<Args extends any[]>(callback: () => (...args: Args) => TemplateResult): (...args: Args) => TemplateResult;
+}
+export declare function defineComponent<T, Name extends string>(
+  tag: LowercaseDashString<Name> | TagOptions<Name>, 
+  component: ComponentFn<T>, 
+  options?: ComponentOptions<T>
+): ComponentClass<T>;
+export declare function createComponent<T>(component: ComponentFn<T>, options?: ComponentOptions<T>): {
+    register: <S extends string>(tag: LowercaseDashString<S> | TagOptions<S>) => ComponentClass<T>;
+};
+
 ```
 
 * `tag`: 自定义元素标签名（或带 extends 配置）
