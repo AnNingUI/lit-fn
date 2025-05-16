@@ -5,3 +5,5 @@ docs/
 _index.ts
 pnpm-lock.yaml
 toMe.txt
+.storybook
+src/stories

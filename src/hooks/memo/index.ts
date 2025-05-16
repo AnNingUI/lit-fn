@@ -1,30 +1,35 @@
-import { currentContainer, type EffectFn } from "../core";
+import { currentContainer } from "../core";
 import { useRef } from "../ref";
 
-export function useMemo<T>(fn: () => T, deps: any[] = []): T {
+export function useMemo<T>(factory: () => T, deps: any[] = []): T {
 	const c = currentContainer!;
 	const idx = c.currentIndex++;
-	const hook = c.effectHooks[idx];
-	const hasDeps = deps.length > 0;
+	// memoHooks 专门存 { deps, value }
+	if (!c.memoHooks) c.memoHooks = [];
+	const hook = c.memoHooks[idx] as { deps: any[]; value: T } | undefined;
 
-	// Initial computation
+	const hasDeps = deps.length > 0;
 	if (!hook) {
-		const value = fn();
-		c.states[idx] = value;
-		c.effectHooks[idx] = { fn: fn as EffectFn, deps };
+		// 第一次：一定执行
+		const value = factory();
+		c.memoHooks[idx] = { deps, value };
+		return value;
 	}
-	// Re-compute only if deps array is non-empty and a dependency changed
-	else if (hasDeps) {
-		const { deps: prevDeps } = hook;
-		const changed = deps.some((d, i) => d !== prevDeps[i]);
+
+	// 如果传了依赖数组并且有变化，再执行
+	if (hasDeps) {
+		const changed =
+			deps.length !== hook.deps.length ||
+			deps.some((d, i) => d !== hook.deps[i]);
 		if (changed) {
-			const value = fn();
-			c.states[idx] = value;
-			c.effectHooks[idx] = { fn: fn as EffectFn, deps };
+			const value = factory();
+			c.memoHooks[idx] = { deps, value };
+			return value;
 		}
 	}
 
-	return c.states[idx];
+	// 不更新
+	return hook.value;
 }
 
 export function useCallback<T extends (...args: any[]) => any>(

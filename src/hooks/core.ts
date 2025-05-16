@@ -15,6 +15,9 @@ export class EventBus<Payload = any> {
 	emit(event: string, payload: Payload) {
 		(this.listeners[event] || []).forEach((l) => l(payload));
 	}
+	destroy() {
+		this.listeners = {};
+	}
 }
 
 export function createUUID(): string {
