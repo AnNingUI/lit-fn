@@ -78,43 +78,6 @@ export interface ComponentContext<T> extends ComponentClass<T> {
 	): (...args: Args) => TemplateResult;
 }
 
-// 在模块顶层初始化一次
-const scheduleMicrotask: (fn: () => void) => void = (() => {
-	if (typeof Promise !== "undefined" && Promise.resolve) {
-		// 标准微任务
-		return (fn) => Promise.resolve().then(fn);
-	}
-	if (typeof MessageChannel !== "undefined") {
-		// MessageChannel 微任务
-		const { port1, port2 } = new MessageChannel();
-		const queue: Array<() => void> = [];
-		port1.onmessage = () => {
-			const cb = queue.shift();
-			if (cb) cb();
-		};
-		return (fn) => {
-			queue.push(fn);
-			port2.postMessage(0);
-		};
-	}
-	if (typeof MutationObserver !== "undefined") {
-		// MutationObserver 微任务
-		const queue: Array<() => void> = [];
-		const node = document.createTextNode("");
-		new MutationObserver(() => {
-			const cb = queue.shift();
-			if (cb) cb();
-		}).observe(node, { characterData: true });
-		let toggle = 0;
-		return (fn) => {
-			queue.push(fn);
-			node.data = String((toggle = 1 - toggle));
-		};
-	}
-	// 最后退回到 setTimeout 宏任务
-	return (fn) => setTimeout(fn, 0);
-})();
-
 export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
 	component: ComponentFn<T>,
@@ -358,7 +321,7 @@ export function defineComponent<T, Name extends string>(
 		private scheduleUpdate() {
 			if (this._scheduled) return;
 			this._scheduled = true;
-			scheduleMicrotask(() => {
+			Promise.resolve().then(() => {
 				this._scheduled = false;
 				if (this.shouldUpdate()) {
 					this.update();
