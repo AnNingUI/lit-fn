@@ -16,7 +16,7 @@ type ComponentFn<T = any> = (
 ) => TemplateResult;
 
 type ComponentOptions<T = any> = {
-	style?: string | CSSResult;
+	style?: string | CSSResult | CSSResult[] | string[] | (CSSResult | string)[];
 	props?: (keyof T)[];
 	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
 		clazz: T
@@ -155,6 +155,23 @@ export function defineComponent<T, Name extends string>(
 					const s = new CSSStyleSheet();
 					s.replaceSync(options.style);
 					this.sheet = s;
+				} else if (Array.isArray(options.style)) {
+					// 处理数组形式的 style
+					const sheets: CSSStyleSheet[] = [];
+					for (const style of options.style) {
+						if (typeof style === "string") {
+							const s = new CSSStyleSheet();
+							s.replaceSync(style);
+							sheets.push(s);
+						} else {
+							sheets.push(style.styleSheet!);
+						}
+					}
+					this.sheet = new CSSStyleSheet();
+					this.sheet.replaceSync("");
+					for (const sheet of sheets) {
+						this.sheet.insertRule(sheet.cssRules[0].cssText);
+					}
 				} else {
 					this.sheet = options.style.styleSheet!;
 				}
