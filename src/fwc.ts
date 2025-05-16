@@ -16,7 +16,7 @@ type ComponentFn<T = any> = (
 ) => TemplateResult;
 
 type ComponentOptions<T = any> = {
-	style?: string | CSSResult;
+	style?: string | CSSResult | CSSResult[] | string[] | (CSSResult | string)[];
 	props?: (keyof T)[];
 	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
 		clazz: T
@@ -78,43 +78,6 @@ export interface ComponentContext<T> extends ComponentClass<T> {
 	): (...args: Args) => TemplateResult;
 }
 
-// 在模块顶层初始化一次
-const scheduleMicrotask: (fn: () => void) => void = (() => {
-	if (typeof Promise !== "undefined" && Promise.resolve) {
-		// 标准微任务
-		return (fn) => Promise.resolve().then(fn);
-	}
-	if (typeof MessageChannel !== "undefined") {
-		// MessageChannel 微任务
-		const { port1, port2 } = new MessageChannel();
-		const queue: Array<() => void> = [];
-		port1.onmessage = () => {
-			const cb = queue.shift();
-			if (cb) cb();
-		};
-		return (fn) => {
-			queue.push(fn);
-			port2.postMessage(0);
-		};
-	}
-	if (typeof MutationObserver !== "undefined") {
-		// MutationObserver 微任务
-		const queue: Array<() => void> = [];
-		const node = document.createTextNode("");
-		new MutationObserver(() => {
-			const cb = queue.shift();
-			if (cb) cb();
-		}).observe(node, { characterData: true });
-		let toggle = 0;
-		return (fn) => {
-			queue.push(fn);
-			node.data = String((toggle = 1 - toggle));
-		};
-	}
-	// 最后退回到 setTimeout 宏任务
-	return (fn) => setTimeout(fn, 0);
-})();
-
 export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
 	component: ComponentFn<T>,
@@ -155,6 +118,23 @@ export function defineComponent<T, Name extends string>(
 					const s = new CSSStyleSheet();
 					s.replaceSync(options.style);
 					this.sheet = s;
+				} else if (Array.isArray(options.style)) {
+					// 处理数组形式的 style
+					const sheets: CSSStyleSheet[] = [];
+					for (const style of options.style) {
+						if (typeof style === "string") {
+							const s = new CSSStyleSheet();
+							s.replaceSync(style);
+							sheets.push(s);
+						} else {
+							sheets.push(style.styleSheet!);
+						}
+					}
+					this.sheet = new CSSStyleSheet();
+					this.sheet.replaceSync("");
+					for (const sheet of sheets) {
+						this.sheet.insertRule(sheet.cssRules[0].cssText);
+					}
 				} else {
 					this.sheet = options.style.styleSheet!;
 				}
@@ -341,7 +321,7 @@ export function defineComponent<T, Name extends string>(
 		private scheduleUpdate() {
 			if (this._scheduled) return;
 			this._scheduled = true;
-			scheduleMicrotask(() => {
+			Promise.resolve().then(() => {
 				this._scheduled = false;
 				if (this.shouldUpdate()) {
 					this.update();

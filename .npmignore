@@ -7,3 +7,4 @@ pnpm-lock.yaml
 toMe.txt
 .storybook
 src/stories
+.cache
