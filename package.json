@@ -1,6 +1,6 @@
 {
 	"name": "lit-fn",
-	"version": "0.1.7",
+	"version": "0.1.7-fix",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -13,8 +13,7 @@
 	"module": "dist/index.es.js",
 	"types": "dist/types/index.d.ts",
 	"dependencies": {
-		"lit": "^3.3.0",
-		"lit-fn": "file:"
+		"lit": "^3.3.0"
 	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "3",

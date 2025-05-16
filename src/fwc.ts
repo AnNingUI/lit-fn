@@ -119,22 +119,32 @@ export function defineComponent<T, Name extends string>(
 					s.replaceSync(options.style);
 					this.sheet = s;
 				} else if (Array.isArray(options.style)) {
-					// 处理数组形式的 style
-					const sheets: CSSStyleSheet[] = [];
+					const combinedSheet = new CSSStyleSheet();
 					for (const style of options.style) {
-						if (typeof style === "string") {
-							const s = new CSSStyleSheet();
-							s.replaceSync(style);
-							sheets.push(s);
-						} else {
-							sheets.push(style.styleSheet!);
+						try {
+							if (typeof style === "string") {
+								const tempSheet = new CSSStyleSheet();
+								tempSheet.replaceSync(style);
+								for (const rule of Array.from(tempSheet.cssRules)) {
+									combinedSheet.insertRule(
+										rule.cssText,
+										combinedSheet.cssRules.length
+									);
+								}
+							} else if (style.styleSheet) {
+								// 如果是 CSSResult 等对象，提取其规则
+								for (const rule of Array.from(style.styleSheet.cssRules)) {
+									combinedSheet.insertRule(
+										rule.cssText,
+										combinedSheet.cssRules.length
+									);
+								}
+							}
+						} catch (e) {
+							console.error("Failed to insert CSS rule:", style, e);
 						}
 					}
-					this.sheet = new CSSStyleSheet();
-					this.sheet.replaceSync("");
-					for (const sheet of sheets) {
-						this.sheet.insertRule(sheet.cssRules[0].cssText);
-					}
+					this.sheet = combinedSheet;
 				} else {
 					this.sheet = options.style.styleSheet!;
 				}
