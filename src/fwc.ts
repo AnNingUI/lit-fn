@@ -12,22 +12,20 @@ export function resetHooks() {
 
 type ComponentFn<T = any> = (
 	props: T,
-	ctx: ComponentClass<T>
+	ctx: ComponentContext<T>
 ) => TemplateResult;
 
 type ComponentOptions<T = any> = {
 	style?: string | CSSResult;
-	lazy?: boolean;
 	props?: (keyof T)[];
-	context?: ComponentContext;
 	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
 		clazz: T
 	) => T;
 };
 
-type ComponentContext = {
-	onAdopted?: () => void;
-};
+// type ComponentContext = {
+// 	onAdopted?: () => void;
+// };
 
 function withContainer<T>(container: HookContainer, fn: () => T): T {
 	const prev = currentContainer;
@@ -50,6 +48,7 @@ function hyphenToCamel(str: string): string {
 export type HookContainer = {
 	states: any[];
 	effectHooks: any[];
+	memoHooks: any[];
 	cleanups: any[];
 	currentIndex: number;
 	rerender: () => void;
@@ -70,10 +69,51 @@ type TagOptions<T extends string> = {
 export interface ComponentClass<T> {
 	get tag(): string;
 	get props(): T;
+}
+
+export interface ComponentContext<T> extends ComponentClass<T> {
+	onAdopted: (callback: () => void) => void;
 	lazy<Args extends any[]>(
 		callback: () => (...args: Args) => TemplateResult
 	): (...args: Args) => TemplateResult;
 }
+
+// 在模块顶层初始化一次
+const scheduleMicrotask: (fn: () => void) => void = (() => {
+	if (typeof Promise !== "undefined" && Promise.resolve) {
+		// 标准微任务
+		return (fn) => Promise.resolve().then(fn);
+	}
+	if (typeof MessageChannel !== "undefined") {
+		// MessageChannel 微任务
+		const { port1, port2 } = new MessageChannel();
+		const queue: Array<() => void> = [];
+		port1.onmessage = () => {
+			const cb = queue.shift();
+			if (cb) cb();
+		};
+		return (fn) => {
+			queue.push(fn);
+			port2.postMessage(0);
+		};
+	}
+	if (typeof MutationObserver !== "undefined") {
+		// MutationObserver 微任务
+		const queue: Array<() => void> = [];
+		const node = document.createTextNode("");
+		new MutationObserver(() => {
+			const cb = queue.shift();
+			if (cb) cb();
+		}).observe(node, { characterData: true });
+		let toggle = 0;
+		return (fn) => {
+			queue.push(fn);
+			node.data = String((toggle = 1 - toggle));
+		};
+	}
+	// 最后退回到 setTimeout 宏任务
+	return (fn) => setTimeout(fn, 0);
+})();
 
 export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
@@ -92,8 +132,12 @@ export function defineComponent<T, Name extends string>(
 		private sheet: CSSStyleSheet | null = null;
 		private shadow = this.attachShadow({ mode: "open" });
 		private hookContainer: HookContainer;
-		private __onAdopted!: () => void;
+		private __onAdopted: (() => void | Promise<void>)[] = [];
 		private templates: Record<string, HTMLTemplateElement> = {};
+		private isUpdating = false;
+		private _dirty = false;
+		private _scheduled = false;
+
 		get tag() {
 			return (
 				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>)
@@ -119,20 +163,21 @@ export function defineComponent<T, Name extends string>(
 			this.hookContainer = {
 				states: [],
 				effectHooks: [],
+				memoHooks: [],
 				cleanups: [],
 				currentIndex: 0,
 				rerender: () => {},
 			};
-			if (options?.context?.onAdopted) {
-				this.__onAdopted = options.context.onAdopted;
-			}
 			options?.props?.forEach((prop) => {
 				const propName = prop as string;
 				Object.defineProperty(this, propName, {
 					get: () => this._props[propName as keyof T],
 					set: (value) => {
-						this._props[propName as keyof T] = value;
-						this.update();
+						if (this._props[prop as keyof T] !== value) {
+							this._props[prop as keyof T] = value;
+							this._dirty = true;
+							this.scheduleUpdate();
+						}
 					},
 					enumerable: true,
 					configurable: true,
@@ -164,6 +209,47 @@ export function defineComponent<T, Name extends string>(
 			};
 		}
 
+		public onAdopted(callback: () => void | Promise<void>) {
+			if (typeof callback === "function") {
+				this.__onAdopted.push(callback);
+			}
+		}
+
+		private async runCallbacks(
+			callbacks: ((
+				element?: HTMLElement,
+				oldProps?: T,
+				newProps?: T
+			) => void | Promise<void>)[],
+			element?: HTMLElement,
+			oldProps?: T,
+			newProps?: T
+		): Promise<void> {
+			const asyncCallbacks: Array<Promise<void>> = [];
+			const syncCallbacks: Array<
+				(element?: HTMLElement, oldProps?: T, newProps?: T) => void
+			> = [];
+
+			// 拆分异步和同步回调
+			for (const callback of callbacks) {
+				if (callback && callback.constructor.name === "AsyncFunction") {
+					asyncCallbacks.push(
+						Promise.resolve(callback(element, oldProps, newProps))
+					);
+				} else if (callback) {
+					syncCallbacks.push(callback);
+				}
+			}
+
+			// 先执行所有异步回调
+			await Promise.all(asyncCallbacks);
+
+			// 再执行所有同步回调
+			for (const callback of syncCallbacks) {
+				callback(element, oldProps, newProps);
+			}
+		}
+
 		connectedCallback() {
 			Array.from(this.children).forEach((node) => {
 				if (node.nodeName === "TEMPLATE") {
@@ -183,9 +269,9 @@ export function defineComponent<T, Name extends string>(
 
 		adoptedCallback() {
 			// 元素被移动到新 document 时触发
-			if (typeof this.__onAdopted === "function") {
-				this.__onAdopted.call(this);
-			}
+			this.runCallbacks(this.__onAdopted).then(() => {
+				this.update();
+			});
 		}
 
 		private syncPropsFromAttributes() {
@@ -240,8 +326,33 @@ export function defineComponent<T, Name extends string>(
 		}
 
 		setProps(newProps: Partial<T>) {
-			this._props = { ...this._props, ...newProps };
-			this.update();
+			for (const key in newProps) {
+				if (
+					Object.prototype.hasOwnProperty.call(newProps, key) &&
+					this._props[key] !== newProps[key]
+				) {
+					this._props[key] = newProps[key] as T[typeof key];
+					this._dirty = true;
+				}
+			}
+			this.scheduleUpdate();
+		}
+
+		private scheduleUpdate() {
+			if (this._scheduled) return;
+			this._scheduled = true;
+			scheduleMicrotask(() => {
+				this._scheduled = false;
+				if (this.shouldUpdate()) {
+					this.update();
+				}
+			});
+		}
+
+		private shouldUpdate(): boolean {
+			const d = this._dirty;
+			this._dirty = false; // 清零以备下次写入
+			return d;
 		}
 
 		get props(): T {
@@ -249,9 +360,14 @@ export function defineComponent<T, Name extends string>(
 		}
 
 		private update() {
+			if (this.isUpdating) return;
+			this.isUpdating = true;
 			withContainer(this.hookContainer, () => {
 				resetHooks();
-				const tpl = component(this.props, this);
+				const tpl = component(
+					this.props,
+					this as unknown as ComponentContext<T>
+				);
 				render(tpl, this.shadow);
 				Object.entries(this.templates).forEach(([name, tmpl]) => {
 					const fragment = tmpl.content.cloneNode(true);
@@ -261,6 +377,7 @@ export function defineComponent<T, Name extends string>(
 					target?.appendChild(fragment);
 				});
 			});
+			this.isUpdating = false;
 		}
 	}
 	if ((tag as TagOptions<Name>)?.extends) {
