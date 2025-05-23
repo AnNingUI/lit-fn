@@ -1,3 +1,4 @@
 export { createComponent, defineComponent } from "./fwc";
-export * from "./hooks";
+export * from "./hooks/index";
+
 // AppMain.register("app-main");

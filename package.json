@@ -1,6 +1,6 @@
 {
 	"name": "lit-fn",
-	"version": "0.1.7-fix",
+	"version": "0.2.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -12,8 +12,24 @@
 	"main": "dist/index.cjs.js",
 	"module": "dist/index.es.js",
 	"types": "dist/types/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/types/index.d.ts",
+			"import": "./dist/index.es.js",
+			"require": "./dist/index.cjs.js"
+		},
+		"./adaper": {
+			"types": "./dist/types/adaper.d.ts",
+			"import": "./dist/adaper.es.js",
+			"require": "./dist/adaper.cjs.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
 	"dependencies": {
-		"lit": "^3.3.0"
+		"lit": "^3.3.0",
+		"lit-fn": "file:"
 	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "3",
@@ -23,6 +39,7 @@
 		"@storybook/test": "8.6.12",
 		"@storybook/web-components": "8.6.12",
 		"@storybook/web-components-vite": "8.6.12",
+		"@types/node": "^22.15.19",
 		"storybook": "8.6.12",
 		"typescript": "^5.8.3",
 		"vite": "^6.3.4",

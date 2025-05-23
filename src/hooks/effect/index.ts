@@ -1,5 +1,7 @@
+import { hooksAdapter } from "@/_adaper";
 import { currentContainer, type EffectFn } from "../core";
-import { useRef } from "../ref";
+import { useRef as BuseRef } from "../ref";
+const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
 
 export function useEffect(fn: EffectFn, deps: any[] = []): void {
 	const c = currentContainer!;
@@ -53,8 +55,8 @@ export function useLayoutEffect(fn: EffectFn, deps: any[] = []) {
 
 // 跳过首次渲染，依赖变化时才调用
 export function useUpdateEffect(fn: () => void, deps: any[]): void {
-	const isFirstRef = useRef(true);
-	useEffect(() => {
+	const isFirstRef = useRef()(true);
+	(hooksAdapter.current?.useEffect ?? useEffect)(() => {
 		if (isFirstRef.current) {
 			isFirstRef.current = false;
 		} else {

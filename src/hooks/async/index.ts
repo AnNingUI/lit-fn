@@ -1,10 +1,13 @@
-import { useEffect } from "../effect";
-import { useRef } from "../ref";
-import { useState } from "../state";
-
+import { hooksAdapter } from "@/_adaper";
+import { useEffect as BuseEffect } from "../effect";
+import { useRef as BuseRef } from "../ref";
+import { useState as BuseState } from "../state";
+const useEffect = () => hooksAdapter.current?.useEffect ?? BuseEffect;
+const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
+const useState = () => hooksAdapter.current?.useState ?? BuseState;
 // setTimeout 管理
 export function useTimeout(fn: () => void, delay: number) {
-	useEffect(() => {
+	useEffect()(() => {
 		const timer = setTimeout(fn, delay);
 		return () => clearTimeout(timer);
 	}, [delay]);
@@ -12,7 +15,7 @@ export function useTimeout(fn: () => void, delay: number) {
 
 // setInterval 管理
 export function useInterval(fn: () => void, interval: number) {
-	useEffect(() => {
+	useEffect()(() => {
 		const timer = setInterval(fn, interval);
 		return () => clearInterval(timer);
 	}, [interval]);
@@ -20,8 +23,8 @@ export function useInterval(fn: () => void, interval: number) {
 
 // 防抖
 export function useDebounce<T>(value: T, wait: number): T {
-	const [debounced, setDebounced] = useState(value);
-	useEffect(() => {
+	const [debounced, setDebounced] = useState()(value);
+	useEffect()(() => {
 		const timer = setTimeout(() => setDebounced(value), wait);
 		return () => clearTimeout(timer);
 	}, [value, wait]);
@@ -30,9 +33,9 @@ export function useDebounce<T>(value: T, wait: number): T {
 
 // 节流
 export function useThrottle<T>(value: T, limit: number): T {
-	const [throttled, setThrottled] = useState(value);
-	const lastRanRef = useRef(Date.now());
-	useEffect(() => {
+	const [throttled, setThrottled] = useState()(value);
+	const lastRanRef = useRef()(Date.now());
+	useEffect()(() => {
 		const handler = () => {
 			if (Date.now() - lastRanRef.current >= limit) {
 				setThrottled(value);
@@ -51,9 +54,9 @@ export function useDebounceFn<T extends (...args: any[]) => any>(
 	deps: any[],
 	wait: number
 ): T {
-	const fnRef = useRef(fn);
+	const fnRef = useRef()(fn);
 	fnRef.current = fn;
-	const debounced = useRef<(...args: any[]) => void>();
+	const debounced = useRef()<(...args: any[]) => void>();
 	if (!debounced.current) {
 		debounced.current = ((...args: any[]) => {
 			clearTimeout((debounced as any).timer);
@@ -63,7 +66,7 @@ export function useDebounceFn<T extends (...args: any[]) => any>(
 			);
 		}) as T;
 	}
-	useEffect(() => () => clearTimeout((debounced as any).timer), deps);
+	useEffect()(() => () => clearTimeout((debounced as any).timer), deps);
 	return debounced.current as T;
 }
 // 节流函数
@@ -72,10 +75,10 @@ export function useThrottleFn<T extends (...args: any[]) => any>(
 	deps: any[],
 	wait: number
 ): T {
-	const fnRef = useRef(fn);
+	const fnRef = useRef()(fn);
 	fnRef.current = fn;
-	const throttled = useRef<(...args: any[]) => void>();
-	const last = useRef(Date.now());
+	const throttled = useRef()<(...args: any[]) => void>();
+	const last = useRef()(Date.now());
 	if (!throttled.current) {
 		throttled.current = ((...args: any[]) => {
 			if (Date.now() - last.current >= wait) {
@@ -85,7 +88,7 @@ export function useThrottleFn<T extends (...args: any[]) => any>(
 		}) as T;
 	}
 	// 在依赖变化时可执行清理或重置操作
-	useEffect(() => {
+	useEffect()(() => {
 		// 可根据需要重置 last 时间戳
 		last.current = Date.now();
 		return () => {
@@ -99,8 +102,8 @@ export function useThrottleFn<T extends (...args: any[]) => any>(
  * useTransition - 支持同步/异步状态过渡 + 加载状态提示
  */
 export function useTransition(delay: number = 300) {
-	const [isPending, setIsPending] = useState(false);
-	const [isLoading, setIsLoading] = useState(false);
+	const [isPending, setIsPending] = useState()(false);
+	const [isLoading, setIsLoading] = useState()(false);
 
 	const startTransition = (fn: () => Promise<any>) => {
 		setIsLoading(true);
@@ -121,10 +124,10 @@ export function useTransition(delay: number = 300) {
  * useDeferredValue - 返回一个延迟更新的值（类似 React 的 useDeferredValue）
  */
 export function useDeferredValue<T>(value: T, delay: number = 300): T {
-	const [deferred, setDeferred] = useState(value);
-	const valueRef = useRef(value);
+	const [deferred, setDeferred] = useState()(value);
+	const valueRef = useRef()(value);
 
-	useEffect(() => {
+	useEffect()(() => {
 		valueRef.current = value;
 		const timer = setTimeout(() => {
 			setDeferred(valueRef.current);
@@ -142,8 +145,8 @@ export function useDeferredValue<T>(value: T, delay: number = 300): T {
 export function useOptimistic<T>(
 	initialValue: T
 ): [T, (optimisticValue: T) => void, () => void] {
-	const [current, setCurrent] = useState(initialValue);
-	const [optimistic, setOptimistic] = useState<T | null>(null);
+	const [current, setCurrent] = useState()(initialValue);
+	const [optimistic, setOptimistic] = useState()<T | null>(null);
 
 	function updateWithOptimistic(optimisticValue: T) {
 		setOptimistic(optimisticValue);
@@ -170,9 +173,9 @@ export function useActionState<T>(
 	action: (input: T) => Promise<any>,
 	initialInput: T
 ): [T, boolean, string | null, (input: T) => void] {
-	const [input, setInput] = useState<T>(initialInput);
-	const [isPending, setIsPending] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [input, setInput] = useState()<T>(initialInput);
+	const [isPending, setIsPending] = useState()(false);
+	const [error, setError] = useState()<string | null>(null);
 
 	const run = async (newInput: T) => {
 		setInput(newInput);

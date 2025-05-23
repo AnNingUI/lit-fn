@@ -1,10 +1,45 @@
-test/
+# 忽略版本控制和编辑器配置
+.git
+.gitignore
+.vscode
+.idea
+
+# 忽略文档和测试
+README.md
+CHANGELOG.md
 docs/
+test/
+tests/
+coverage/
+__tests__/
+
+# 忽略源码（如果编译后才需要发布）
+src/
+babel.config.js
+webpack.config.js
+rollup.config.js
+vite.config.js
+
+# 忽略构建工具配置
+*.config.js
+*.config.ts
 *.log
-*.tgz
-_index.ts
+
+# 忽略构建输出（仅当不是发布 dist 时）
+build/
+dist/
+out/
+
+# 忽略示例和脚本
+examples/
+scripts/
+demo/
+
+# 忽略 lock 文件
+package-lock.json
+yarn.lock
 pnpm-lock.yaml
-toMe.txt
-.storybook
-src/stories
-.cache
+bun.lockb
+
+# 忽略环境变量文件
+.env*
