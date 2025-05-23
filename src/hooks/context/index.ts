@@ -1,18 +1,12 @@
-import { TemplateResult } from "lit";
-import { currentContainer, EventBus } from "../core";
-import { useEffect } from "../effect";
-import { useRef } from "../ref";
-import { useState } from "../state";
+import { hooksAdapter } from "@/_adaper";
+import { Context, ContextChildren, currentContainer, EventBus } from "../core";
+import { useEffect as BuseEffect } from "../effect";
+import { useRef as BuseRef } from "../ref";
+import { useState as BuseState } from "../state";
+const useEffect = () => hooksAdapter.current?.useEffect ?? BuseEffect;
+const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
+const useState = () => hooksAdapter.current?.useState ?? BuseState;
 
-type ContextChildren = TemplateResult | (() => TemplateResult);
-interface Context<T> {
-	_currentValue: T;
-	Provider: {
-		(value: T): (children: ContextChildren) => TemplateResult; // 第一种调用方式
-		(props: { value: T; children: ContextChildren }): TemplateResult; // 第二种调用方式
-	};
-	__contextId: string; // 唯一标识符用于事件隔离
-}
 let contextCounter = 0;
 /**
  * 创建一个新的上下文对象
@@ -75,7 +69,7 @@ export function useContext<T>(context: Context<T>): T {
 		c.states[idx] = context._currentValue;
 	}
 
-	useEffect(() => {
+	useEffect()(() => {
 		const handler = (e: Event) => {
 			const event = e as CustomEvent;
 			c.states[idx] = event.detail;
@@ -98,7 +92,7 @@ export function useContext<T>(context: Context<T>): T {
 
 // 提供单例事件总线
 export function useEventBus<Payload = any>(): EventBus<Payload> {
-	const ref = useRef<EventBus<Payload>>(new EventBus());
+	const ref = useRef()<EventBus<Payload>>(new EventBus());
 	return ref.current;
 }
 
@@ -108,7 +102,7 @@ export function useEmitter<Payload = any>(
 	event: string,
 	handler: (payload: Payload) => void
 ) {
-	useEffect(() => {
+	useEffect()(() => {
 		emitter.on(event, handler);
 		return () => emitter.off(event, handler);
 	}, [emitter, event, handler]);
@@ -119,12 +113,12 @@ export function useSyncExternalStore<S>(
 	getSnapshot: () => S,
 	getServerSnapshot?: () => S
 ): S {
-	const [state, setState] = useState<S>(() => {
+	const [state, setState] = useState()<S>(() => {
 		// SSR 支持：优先使用 getServerSnapshot
 		return getServerSnapshot ? getServerSnapshot() : getSnapshot();
 	});
 
-	useEffect(() => {
+	useEffect()(() => {
 		// 订阅外部 store 变化
 		const unsubscribe = subscribe(() => {
 			const snapshot = getSnapshot();

@@ -1,5 +1,7 @@
+import { hooksAdapter } from "@/_adaper";
 import { currentContainer } from "../core";
-import { useRef } from "../ref";
+import { useRef as BuseRef } from "../ref";
+const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
 
 export function useMemo<T>(factory: () => T, deps: any[] = []): T {
 	const c = currentContainer!;
@@ -36,13 +38,13 @@ export function useCallback<T extends (...args: any[]) => any>(
 	fn: T,
 	deps: any[] = []
 ): T {
-	return useMemo(() => fn, deps) as T;
+	return (hooksAdapter.current?.useMemo ?? useMemo)(() => fn, deps) as T;
 }
 
 export function useMemoizedFn<T extends (...args: any[]) => any>(fn: T): T {
-	const fnRef = useRef(fn);
+	const fnRef = useRef()(fn);
 	fnRef.current = fn;
-	const memoized = useRef<(...args: any[]) => any>();
+	const memoized = useRef()<(...args: any[]) => any>();
 	if (!memoized.current) {
 		memoized.current = ((...args: any[]) => fnRef.current(...args)) as T;
 	}

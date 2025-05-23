@@ -10,10 +10,9 @@ export function resetHooks() {
 	currentContainer.currentIndex = 0;
 }
 
-type ComponentFn<T = any> = (
-	props: T,
-	ctx: ComponentContext<T>
-) => TemplateResult;
+type ComponentFn<T = any> =
+	| ((props: T, ctx: ComponentContext<T>) => TemplateResult)
+	| ((props: T, ctx: ComponentContext<T>) => () => TemplateResult);
 
 type ComponentOptions<T = any> = {
 	style?: string | CSSResult | CSSResult[] | string[] | (CSSResult | string)[];
@@ -86,7 +85,6 @@ export function defineComponent<T, Name extends string>(
 	const observedAttributes =
 		options?.props?.map((p) => camelToHyphen(p as string)) || [];
 	const mixinFn = options?.mixinFn || ((clazz) => clazz);
-
 	class FunctionElement
 		extends mixinFn(HTMLElement)
 		implements ComponentClass<T>
@@ -141,7 +139,7 @@ export function defineComponent<T, Name extends string>(
 								}
 							}
 						} catch (e) {
-							console.error("Failed to insert CSS rule:", style, e);
+							// console.error("Failed to insert CSS rule:", style, e);
 						}
 					}
 					this.sheet = combinedSheet;
@@ -358,7 +356,8 @@ export function defineComponent<T, Name extends string>(
 					this.props,
 					this as unknown as ComponentContext<T>
 				);
-				render(tpl, this.shadow);
+				const tpl2 = typeof tpl === "function" ? tpl() : tpl;
+				render(tpl2, this.shadow);
 				Object.entries(this.templates).forEach(([name, tmpl]) => {
 					const fragment = tmpl.content.cloneNode(true);
 					const target = name

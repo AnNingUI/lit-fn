@@ -216,3 +216,4 @@ MyCounter.register("my-counter");
 
 ### 注意事项
 > [对于箭头函数组件TDZ(Uncaught ReferenceError: Cannot access 'xxx' before initialization)问题的处理](./Precautions/TDZ.md)
+> [任何创建hook适配器](./Precautions/Adapter.md)

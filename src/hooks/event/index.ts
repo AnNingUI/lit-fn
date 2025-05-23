@@ -1,5 +1,6 @@
-import { useEffect } from "../effect";
-
+import { hooksAdapter } from "@/_adaper";
+import { useEffect as BuseEffect } from "../effect";
+const useEffect = () => hooksAdapter.current?.useEffect ?? BuseEffect;
 // 通用事件绑定
 export function useEventListener<K extends keyof HTMLElementEventMap>(
 	target: EventTarget,
@@ -7,7 +8,7 @@ export function useEventListener<K extends keyof HTMLElementEventMap>(
 	listener: (e: HTMLElementEventMap[K]) => void,
 	options?: boolean | AddEventListenerOptions
 ) {
-	useEffect(() => {
+	useEffect()(() => {
 		target.addEventListener(type, listener as EventListener, options);
 		return () => {
 			target.removeEventListener(type, listener as EventListener, options);
@@ -33,7 +34,7 @@ export function useLongPress<T extends HTMLElement = HTMLElement>(
 	callback: () => void,
 	ms: number = 300
 ) {
-	useEffect(() => {
+	useEffect()(() => {
 		const el = ref.current;
 		if (!el) return;
 		let timer: number;
@@ -57,7 +58,7 @@ export function useResizeObserver<T extends HTMLElement = HTMLElement>(
 	ref: { current: T | null },
 	callback: ResizeObserverCallback
 ) {
-	useEffect(() => {
+	useEffect()(() => {
 		const el = ref.current;
 		if (!el) return;
 		const obs = new ResizeObserver(callback);
