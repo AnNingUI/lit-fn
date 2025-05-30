@@ -7,7 +7,6 @@ import {
 	PropertyValues,
 	TemplateResult,
 } from "lit";
-import { customElement } from "lit/decorators.js";
 
 // ---------------------------
 // Hook 系统相关类型 & 函数
@@ -120,7 +119,6 @@ export function defineComponent<T, Name extends string>(
 	// 4. mixinFn：如果用户想把 LitElement 再包一层 mixin，可以传入
 	const BaseClass = options?.mixinFn ? options.mixinFn(LitElement) : LitElement;
 
-	@customElement(tagName)
 	class FunctionElement
 		extends BaseClass
 		implements ComponentClass<T>, ComponentContext<T>
