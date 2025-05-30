@@ -77,6 +77,12 @@ export interface ComponentContext<T> extends ComponentClass<T> {
 	): (...args: Args) => TemplateResult;
 }
 
+function getTagByTag<Name extends string>(
+	tag: LowercaseDashString<Name> | TagOptions<Name>
+) {
+	return (tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>);
+}
+
 export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
 	component: ComponentFn<T>,
@@ -369,17 +375,19 @@ export function defineComponent<T, Name extends string>(
 			this.isUpdating = false;
 		}
 	}
-	if ((tag as TagOptions<Name>)?.extends) {
-		customElements.define(
-			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-			FunctionElement,
-			{ extends: (tag as TagOptions<Name>)?.extends }
-		);
-	} else {
-		customElements.define(
-			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-			FunctionElement
-		);
+	if (!customElements.get(getTagByTag(tag))) {
+		if ((tag as TagOptions<Name>)?.extends) {
+			customElements.define(
+				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+				FunctionElement,
+				{ extends: (tag as TagOptions<Name>)?.extends }
+			);
+		} else {
+			customElements.define(
+				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+				FunctionElement
+			);
+		}
 	}
 	return FunctionElement as unknown as ComponentClass<T>;
 }
