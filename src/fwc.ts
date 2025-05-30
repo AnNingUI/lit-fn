@@ -1,4 +1,27 @@
-import { CSSResult, html, render, TemplateResult } from "lit";
+import {
+	css,
+	CSSResult,
+	html,
+	LitElement,
+	PropertyDeclaration,
+	PropertyValues,
+	TemplateResult,
+} from "lit";
+import { customElement } from "lit/decorators.js";
+
+// ---------------------------
+// Hook 系统相关类型 & 函数
+// ---------------------------
+export type HookContainer = {
+	states: any[];
+	effectHooks: any[];
+	memoHooks: any[];
+	cleanups: any[];
+	currentIndex: number;
+	rerender: () => void;
+};
+export let currentContainer: HookContainer | null = null;
+
 export function injectRerender(fn: () => void) {
 	if (currentContainer) {
 		currentContainer.rerender = fn;
@@ -10,22 +33,7 @@ export function resetHooks() {
 	currentContainer.currentIndex = 0;
 }
 
-type ComponentFn<T = any> =
-	| ((props: T, ctx: ComponentContext<T>) => TemplateResult)
-	| ((props: T, ctx: ComponentContext<T>) => () => TemplateResult);
-
-type ComponentOptions<T = any> = {
-	style?: string | CSSResult | CSSResult[] | string[] | (CSSResult | string)[];
-	props?: (keyof T)[];
-	mixinFn?: <T extends new (...args: any) => F, F extends HTMLElement>(
-		clazz: T
-	) => T;
-};
-
-// type ComponentContext = {
-// 	onAdopted?: () => void;
-// };
-
+// withContainer 必须在 component 调用之前就声明
 function withContainer<T>(container: HookContainer, fn: () => T): T {
 	const prev = currentContainer;
 	currentContainer = container;
@@ -36,219 +44,163 @@ function withContainer<T>(container: HookContainer, fn: () => T): T {
 	}
 }
 
-function camelToHyphen(str: string): string {
-	return str.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-}
+// ---------------------------
+// 工具类型声明
+// ---------------------------
 
-function hyphenToCamel(str: string): string {
-	return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
+type ComponentFn<T = any> =
+	| ((props: T, ctx: ComponentContext<T>) => TemplateResult)
+	| ((props: T, ctx: ComponentContext<T>) => () => TemplateResult);
 
-export type HookContainer = {
-	states: any[];
-	effectHooks: any[];
-	memoHooks: any[];
-	cleanups: any[];
-	currentIndex: number;
-	rerender: () => void;
+type ComponentOptions<T = any> = {
+	style?: string | CSSResult | (CSSResult | string)[];
+	props?: (keyof T)[];
+	mixinFn?: <T2 extends new (...args: any) => any>(clazz: T2) => T2;
 };
-export let currentContainer: HookContainer | null = null;
 
 type LowercaseDashString<T extends string> = T extends `${string}-${string}`
 	? T extends Lowercase<T>
 		? T
 		: never
 	: never;
-
 type TagOptions<T extends string> = {
 	name: LowercaseDashString<T>;
 	extends: keyof HTMLElementTagNameMap;
 };
 
+// ComponentClass / ComponentContext 接口，与之前保持一致
 export interface ComponentClass<T> {
 	get tag(): string;
 	get props(): T;
 }
 
 export interface ComponentContext<T> extends ComponentClass<T> {
-	onAdopted: (callback: () => void) => void;
+	onAdopted: (callback: () => void | Promise<void>) => void;
 	lazy<Args extends any[]>(
 		callback: () => (...args: Args) => TemplateResult
 	): (...args: Args) => TemplateResult;
-}
-
-function getTagByTag<Name extends string>(
-	tag: LowercaseDashString<Name> | TagOptions<Name>
-) {
-	return (tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>);
 }
 
 export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
 	component: ComponentFn<T>,
 	options?: ComponentOptions<T>
-): ComponentClass<T> {
-	let tagName = getTagByTag(tag);
+): ComponentClass<T> & LitElement {
+	// 1. 规范化 tagName
+	const tagName =
+		(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>);
+
+	// 如果已注册过，直接返回
 	if (customElements.get(tagName)) {
-		return customElements.get(tagName) as unknown as ComponentClass<T>;
+		return customElements.get(tagName) as unknown as ComponentClass<T> &
+			LitElement;
 	}
-	const observedAttributes =
-		options?.props?.map((p) => camelToHyphen(p as string)) || [];
-	const mixinFn = options?.mixinFn || ((clazz) => clazz);
-	class FunctionElement
-		extends mixinFn(HTMLElement)
-		implements ComponentClass<T>
-	{
-		private _props: T = {} as T;
-		private sheet: CSSStyleSheet | null = null;
-		private shadow = this.attachShadow({ mode: "open" });
-		private hookContainer: HookContainer;
-		private __onAdopted: (() => void | Promise<void>)[] = [];
-		private templates: Record<string, HTMLTemplateElement> = {};
-		private isUpdating = false;
-		private _dirty = false;
-		private _scheduled = false;
 
-		get tag() {
-			return (
-				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>)
+	// 2. 从 options.props 里构造 LitElement 的 static properties
+	const observedProps = options?.props || [];
+	const staticProps: { [key: string]: PropertyDeclaration } = {};
+	observedProps.forEach((key) => {
+		staticProps[key as string] = { type: Object };
+	});
+
+	// 3. 收集 style 到 LitElement 的 static styles
+	let combinedStyles: CSSResult | CSSResult[] | undefined;
+	if (options?.style) {
+		if (Array.isArray(options.style)) {
+			combinedStyles = options.style.map((s) =>
+				typeof s === "string" ? css([s] as any) : s
 			);
+		} else if (typeof options.style === "string") {
+			combinedStyles = css([options.style] as any);
+		} else {
+			combinedStyles = options.style;
 		}
+	}
 
-		static get observedAttributes() {
-			return observedAttributes;
+	// 4. mixinFn：如果用户想把 LitElement 再包一层 mixin，可以传入
+	const BaseClass = options?.mixinFn ? options.mixinFn(LitElement) : LitElement;
+
+	@customElement(tagName)
+	class FunctionElement
+		extends BaseClass
+		implements ComponentClass<T>, ComponentContext<T>
+	{
+		// 4.1 把 static properties 和 static styles 挂在类上
+		static get properties() {
+			return staticProps;
 		}
+		static styles = combinedStyles;
+
+		// Hook 容器
+		private hookContainer: HookContainer;
+
+		// 存储 <template slot="..."> … </template> 的内容
+		private templates: Record<string, HTMLTemplateElement> = {};
+
+		// onAdopted 回调队列
+		private __onAdopted: Array<() => void | Promise<void>> = [];
 
 		constructor() {
 			super();
-			if (options?.style) {
-				if (typeof options.style === "string") {
-					const s = new CSSStyleSheet();
-					s.replaceSync(options.style);
-					this.sheet = s;
-				} else if (Array.isArray(options.style)) {
-					const combinedSheet = new CSSStyleSheet();
-					for (const style of options.style) {
-						try {
-							if (typeof style === "string") {
-								const tempSheet = new CSSStyleSheet();
-								tempSheet.replaceSync(style);
-								for (const rule of Array.from(tempSheet.cssRules)) {
-									combinedSheet.insertRule(
-										rule.cssText,
-										combinedSheet.cssRules.length
-									);
-								}
-							} else if (style.styleSheet) {
-								// 如果是 CSSResult 等对象，提取其规则
-								for (const rule of Array.from(style.styleSheet.cssRules)) {
-									combinedSheet.insertRule(
-										rule.cssText,
-										combinedSheet.cssRules.length
-									);
-								}
-							}
-						} catch (e) {
-							// console.error("Failed to insert CSS rule:", style, e);
-						}
-					}
-					this.sheet = combinedSheet;
-				} else {
-					this.sheet = options.style.styleSheet!;
-				}
-			}
-			// 为每个prop定义访问器
+			// 初始化 HookContainer
 			this.hookContainer = {
 				states: [],
 				effectHooks: [],
 				memoHooks: [],
 				cleanups: [],
 				currentIndex: 0,
-				rerender: () => {},
+				rerender: () => {
+					// 当 Hook 调用 injectRerender 时，LitElement.requestUpdate() 负责重新渲染
+					this.requestUpdate();
+				},
 			};
-			options?.props?.forEach((prop) => {
-				const propName = prop as string;
-				Object.defineProperty(this, propName, {
-					get: () => this._props[propName as keyof T],
-					set: (value) => {
-						if (this._props[prop as keyof T] !== value) {
-							this._props[prop as keyof T] = value;
-							this._dirty = true;
-							this.scheduleUpdate();
-						}
-					},
-					enumerable: true,
-					configurable: true,
-				});
-			});
-			if (this.sheet) {
-				this.shadow.adoptedStyleSheets = [this.sheet];
+		}
+
+		// ---------------------------
+		// ComponentClass & ComponentContext 实现
+		// ---------------------------
+
+		get tag(): string {
+			return tagName;
+		}
+
+		get props(): T {
+			// LitElement 会把属性自动映射到实例上，所以直接把 this 断言成 T
+			return this as unknown as T;
+		}
+
+		onAdopted(callback: () => void | Promise<void>) {
+			if (typeof callback === "function") {
+				this.__onAdopted.push(callback);
 			}
 		}
 
-		// Uncaught ReferenceError: Cannot access 'counter' before initialization
-		// 用来避免在构造函数中使用 未定义 函数时报错
 		public lazy<Args extends any[]>(
 			callback: () => (...args: Args) => TemplateResult
-		) {
+		): (...args: Args) => TemplateResult {
 			const _callback = (callback ?? (() => callback)) as () => (
 				...args: Args
 			) => TemplateResult;
-			// 延迟到真正渲染子组件时再调用，并捕获任何运行时错误
 			return (...args: Args) => {
 				try {
 					return _callback().apply(this, args);
 				} catch (e) {
 					setTimeout(() => {
-						this.update();
+						this.requestUpdate();
 					}, 0);
 					return html`<!-- lazy component error: ${(e as Error).message} -->`;
 				}
 			};
 		}
 
-		public onAdopted(callback: () => void | Promise<void>) {
-			if (typeof callback === "function") {
-				this.__onAdopted.push(callback);
-			}
-		}
-
-		private async runCallbacks(
-			callbacks: ((
-				element?: HTMLElement,
-				oldProps?: T,
-				newProps?: T
-			) => void | Promise<void>)[],
-			element?: HTMLElement,
-			oldProps?: T,
-			newProps?: T
-		): Promise<void> {
-			const asyncCallbacks: Array<Promise<void>> = [];
-			const syncCallbacks: Array<
-				(element?: HTMLElement, oldProps?: T, newProps?: T) => void
-			> = [];
-
-			// 拆分异步和同步回调
-			for (const callback of callbacks) {
-				if (callback && callback.constructor.name === "AsyncFunction") {
-					asyncCallbacks.push(
-						Promise.resolve(callback(element, oldProps, newProps))
-					);
-				} else if (callback) {
-					syncCallbacks.push(callback);
-				}
-			}
-
-			// 先执行所有异步回调
-			await Promise.all(asyncCallbacks);
-
-			// 再执行所有同步回调
-			for (const callback of syncCallbacks) {
-				callback(element, oldProps, newProps);
-			}
-		}
+		// ---------------------------
+		// 覆写 LitElement 的生命周期
+		// ---------------------------
 
 		connectedCallback() {
+			super.connectedCallback();
+
+			// 提取 <template slot="xxx">…</template> 内容
 			Array.from(this.children).forEach((node) => {
 				if (node.nodeName === "TEMPLATE") {
 					const tpl = node as HTMLTemplateElement;
@@ -257,142 +209,100 @@ export function defineComponent<T, Name extends string>(
 					tpl.remove();
 				}
 			});
-			// 处理初始属性
+
+			// 首次挂载时，只要让 HookContainer 初始化一次即可，后续全部走 render()
 			withContainer(this.hookContainer, () => {
-				this.syncPropsFromAttributes();
-				injectRerender(() => this.update());
-				this.update();
-			});
-		}
-
-		adoptedCallback() {
-			// 元素被移动到新 document 时触发
-			this.runCallbacks(this.__onAdopted).then(() => {
-				this.update();
-			});
-		}
-
-		private syncPropsFromAttributes() {
-			const attributeNames = this.getAttributeNames();
-			attributeNames.forEach((attr) => {
-				const hyphenName = attr;
-				if (observedAttributes.includes(hyphenName)) {
-					const propName = hyphenToCamel(hyphenName) as keyof T;
-					this._props[propName] = this.parseAttr(this.getAttribute(attr));
-					this.removeAttribute(attr); // 移除声明为props的属性
-				}
+				resetHooks();
+				// 仅初始化 Hook，不实际渲染。真正渲染由 LitElement 调用 render() 完成
 			});
 		}
 
 		disconnectedCallback() {
-			this.hookContainer.cleanups.forEach((cleanup) => {
-				if (typeof cleanup === "function") cleanup();
+			super.disconnectedCallback();
+			// 执行所有注册到 HookContainer 上的 cleanup
+			this.hookContainer.cleanups.forEach((fn) => {
+				if (typeof fn === "function") fn();
 			});
 		}
 
-		attributeChangedCallback(name: string, _oldVal: string, newVal: string) {
-			const propName = hyphenToCamel(name) as keyof T;
-			if (options?.props?.includes(propName)) {
-				this._props[propName] = this.parseAttr(newVal);
-				this.update();
-			}
-		}
-
-		private parseAttr(val: string | null): any {
-			// 属性不存在时，返回 undefined 而非 true
-			if (val === null) return undefined;
-
-			// 布尔
-			if (val === "true" || val === "false") {
-				return val === "true";
-			}
-			// 数值
-			if (!isNaN(Number(val))) {
-				return Number(val);
-			}
-			// JSON 对象/数组
-			try {
-				const parsed = JSON.parse(val);
-				// 只有对象或数组才返回 parsed
-				if (typeof parsed === "object") return parsed;
-			} catch {
-				/* ignore */
-			}
-
-			// 退化为字符串
-			return val;
-		}
-
-		setProps(newProps: Partial<T>) {
-			for (const key in newProps) {
-				if (
-					Object.prototype.hasOwnProperty.call(newProps, key) &&
-					this._props[key] !== newProps[key]
-				) {
-					this._props[key] = newProps[key] as T[typeof key];
-					this._dirty = true;
+		// LitElement 没有把 adoptedCallback 声明到类型里，直接用 @ts-ignore 绕过
+		// 当这个元素被移动到另一个 document 时，会调用 adoptedCallback
+		// 在这里把所有 onAdopted 回调执行完
+		// 再次触发一次更新
+		// tslint:disable-next-line: no-unused-variable
+		// @ts-ignore
+		adoptedCallback() {
+			// 虽然 LitElement 类型声明里没有 adoptedCallback，但它确实会被调用
+			// 我们用 @ts-ignore 忽略类型检查
+			(async () => {
+				const asyncTasks: Array<Promise<void>> = [];
+				const syncTasks: Array<() => void> = [];
+				for (const cb of this.__onAdopted) {
+					if (cb.constructor.name === "AsyncFunction") {
+						asyncTasks.push(Promise.resolve(cb()));
+					} else {
+						syncTasks.push(cb);
+					}
 				}
-			}
-			this.scheduleUpdate();
+				await Promise.all(asyncTasks);
+				syncTasks.forEach((cb) => cb());
+				this.requestUpdate();
+			})();
 		}
 
-		private scheduleUpdate() {
-			if (this._scheduled) return;
-			this._scheduled = true;
-			Promise.resolve().then(() => {
-				this._scheduled = false;
-				if (this.shouldUpdate()) {
-					this.update();
-				}
-			});
+		// LitElement 在属性（props）变化时，会自动触发 shouldUpdate → render → updateComplete
+		// 我们保持默认的 shouldUpdate 逻辑
+		protected shouldUpdate(_changedProps: PropertyValues): boolean {
+			return super.shouldUpdate(_changedProps);
 		}
 
-		private shouldUpdate(): boolean {
-			const d = this._dirty;
-			this._dirty = false; // 清零以备下次写入
-			return d;
-		}
+		// 真正的渲染：把用户的 component(props, ctx) 的输出交给 LitElement
+		protected render(): TemplateResult {
+			// tpl 可能是 TemplateResult，或者是 ()=>TemplateResult。先用 ! 告诉 TS 我们肯定会给它赋值
+			let tpl!: TemplateResult | (() => TemplateResult);
 
-		get props(): T {
-			return this._props;
-		}
-
-		private update() {
-			if (this.isUpdating) return;
-			this.isUpdating = true;
+			// 在 render 里，把 currentContainer 设置为 this.hookContainer，从而支持所有 Hook
 			withContainer(this.hookContainer, () => {
 				resetHooks();
-				const tpl = component(
-					this.props,
-					this as unknown as ComponentContext<T>
-				);
-				const tpl2 = typeof tpl === "function" ? tpl() : tpl;
-				render(tpl2, this.shadow);
-				Object.entries(this.templates).forEach(([name, tmpl]) => {
-					const fragment = tmpl.content.cloneNode(true);
-					const target = name
-						? this.shadow.querySelector(`[slot="${name}"]`)
-						: this.shadow;
-					target?.appendChild(fragment);
-				});
+				tpl = component(this.props, this as unknown as ComponentContext<T>);
 			});
-			this.isUpdating = false;
+
+			// 如果用户返回了函数，就执行它
+			const finalTpl: TemplateResult =
+				typeof tpl === "function" ? (tpl as () => TemplateResult)() : tpl;
+
+			// 如果存在 <template slot="..."> 内容，把它们拼接到最后
+			if (Object.keys(this.templates).length > 0) {
+				return html`
+					<div>
+						${finalTpl}
+						${Object.entries(this.templates).map(
+							([slotName, tmpl]) => html`
+								${slotName
+									? html`<div slot="${slotName}">
+											${tmpl.content.cloneNode(true)}
+									  </div>`
+									: html`${tmpl.content.cloneNode(true)}`}
+							`
+						)}
+					</div>
+				`;
+			}
+
+			return finalTpl;
 		}
 	}
 
+	// 如果指定了 extends，就用第二个参数形式注册（例如 <button is="my-button">）
 	if ((tag as TagOptions<Name>)?.extends) {
-		customElements.define(
-			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-			FunctionElement,
-			{ extends: (tag as TagOptions<Name>)?.extends }
-		);
+		customElements.define(tagName, FunctionElement, {
+			extends: (tag as TagOptions<Name>).extends,
+		});
 	} else {
-		customElements.define(
-			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-			FunctionElement
-		);
+		customElements.define(tagName, FunctionElement);
 	}
-	return FunctionElement as unknown as ComponentClass<T>;
+
+	return FunctionElement as unknown as ComponentClass<T> & LitElement;
 }
 
 export function createComponent<T>(
