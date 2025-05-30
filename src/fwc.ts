@@ -88,6 +88,10 @@ export function defineComponent<T, Name extends string>(
 	component: ComponentFn<T>,
 	options?: ComponentOptions<T>
 ): ComponentClass<T> {
+	let tagName = getTagByTag(tag);
+	if (customElements.get(tagName)) {
+		return customElements.get(tagName) as unknown as ComponentClass<T>;
+	}
 	const observedAttributes =
 		options?.props?.map((p) => camelToHyphen(p as string)) || [];
 	const mixinFn = options?.mixinFn || ((clazz) => clazz);
@@ -375,19 +379,18 @@ export function defineComponent<T, Name extends string>(
 			this.isUpdating = false;
 		}
 	}
-	if (!customElements.get(getTagByTag(tag))) {
-		if ((tag as TagOptions<Name>)?.extends) {
-			customElements.define(
-				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-				FunctionElement,
-				{ extends: (tag as TagOptions<Name>)?.extends }
-			);
-		} else {
-			customElements.define(
-				(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
-				FunctionElement
-			);
-		}
+
+	if ((tag as TagOptions<Name>)?.extends) {
+		customElements.define(
+			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+			FunctionElement,
+			{ extends: (tag as TagOptions<Name>)?.extends }
+		);
+	} else {
+		customElements.define(
+			(tag as TagOptions<Name>)?.name || (tag as LowercaseDashString<Name>),
+			FunctionElement
+		);
 	}
 	return FunctionElement as unknown as ComponentClass<T>;
 }
