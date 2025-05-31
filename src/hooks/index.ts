@@ -49,8 +49,14 @@ export const useMemoizedFn = <T extends (...args: any[]) => any>(fn: T) =>
 	(hooksAdapter.current?.useMemoizedFn ?? basic.useMemoizedFn)(fn);
 
 // ==== Context ====
-export const createContext = <T>(defaultValue?: T) =>
-	(hooksAdapter.current?.createContext ?? basic.createContext)(defaultValue);
+export const createContext = <T>(
+	defaultValue: T,
+	proxy?: basic.ContextProxy<T>
+) =>
+	(hooksAdapter.current?.createContext ?? basic.createContext)(
+		defaultValue,
+		proxy
+	);
 
 export const useContext = <T>(context: Context<T>) =>
 	(hooksAdapter.current?.useContext ?? basic.useContext)(context);
