@@ -163,6 +163,14 @@ export const useInterval = (fn: () => void, interval: number) =>
 export const useDebounce = <T>(value: T, wait: number) =>
 	(hooksAdapter.current?.useDebounce ?? basic.useDebounce)(value, wait);
 
+export const useAsync = <T = any, P extends any[] = any[]>(
+	asyncFunction: (...params: P) => Promise<T>,
+	option: {
+		immediate?: boolean;
+		initialParams?: P;
+	}
+) => (hooksAdapter.current?.useAsync ?? basic.useAsync)(asyncFunction, option);
+
 export const useThrottle = <T>(value: T, limit: number) =>
 	(hooksAdapter.current?.useThrottle ?? basic.useThrottle)(value, limit);
 

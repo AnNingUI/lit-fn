@@ -1,4 +1,4 @@
-import { hooksAdapter } from "@/_adaper";
+import { hooksAdapter } from "../../_adaper";
 import { currentContainer, type EffectFn } from "../core";
 import { useRef as BuseRef } from "../ref";
 const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
