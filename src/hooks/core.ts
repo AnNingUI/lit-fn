@@ -10,6 +10,8 @@ export interface Context<T> {
 		(props: { value: T; children: ContextChildren }): TemplateResult; // 第二种调用方式
 	};
 	__contextId: string; // 唯一标识符用于事件隔离
+
+	_eventBus: EventBus<T>;
 }
 // 事件总线
 export class EventBus<Payload = any> {
