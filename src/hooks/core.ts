@@ -34,3 +34,14 @@ export class EventBus<Payload = any> {
 export function createUUID(): string {
 	return crypto.randomUUID();
 }
+
+export type AsyncState<T> = {
+	loading: boolean;
+	data: T | null;
+	error: Error | null;
+};
+
+export type UseAsyncReturn<T, P extends any[]> = AsyncState<T> & {
+	run: (...params: P) => Promise<T | undefined>;
+	reset: () => void;
+};

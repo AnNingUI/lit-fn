@@ -1,16 +1,138 @@
 import { hooksAdapter } from "@/_adaper";
+import { UseAsyncReturn } from "../core";
 import { useEffect as BuseEffect } from "../effect";
+import { useCallback as BuseCallback } from "../memo";
 import { useRef as BuseRef } from "../ref";
 import { useState as BuseState } from "../state";
 const useEffect = () => hooksAdapter.current?.useEffect ?? BuseEffect;
 const useRef = () => hooksAdapter.current?.useRef ?? BuseRef;
 const useState = () => hooksAdapter.current?.useState ?? BuseState;
+const useCallback = () => hooksAdapter.current?.useCallback ?? BuseCallback;
 // setTimeout 管理
 export function useTimeout(fn: () => void, delay: number) {
 	useEffect()(() => {
 		const timer = setTimeout(fn, delay);
 		return () => clearTimeout(timer);
 	}, [delay]);
+}
+
+export function useAsync<T = any, P extends any[] = any[]>(
+	asyncFunction: (...params: P) => Promise<T>,
+	options?: {
+		immediate?: boolean;
+		initialParams?: P;
+	}
+): UseAsyncReturn<T, P> {
+	const { immediate = true, initialParams } = options || {};
+
+	const [loading, setLoading] = useState()<boolean>(false);
+	const [data, setData] = useState()<T | null>(null);
+	const [error, setError] = useState()<Error | null>(null);
+
+	// Use ref to store the latest asyncFunction without recreating `run`
+	const asyncFnRef = useRef()(asyncFunction);
+	asyncFnRef.current = asyncFunction; // Always keep the latest version
+
+	// Use ref for request identifier to prevent race conditions
+	const lastCallId = useRef()(0);
+
+	// Use ref for AbortController to manage cancellation of ongoing requests
+	const abortControllerRef = useRef()<AbortController | null>(null);
+
+	// The 'run' function is stable across renders due to useCallback with empty deps.
+	// It will always use the latest asyncFunction from asyncFnRef.
+	const run = useCallback()(async (...params: P): Promise<T | undefined> => {
+		const callId = ++lastCallId.current;
+
+		// Abort any previously ongoing request managed by this hook
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort();
+		}
+		// Create a new AbortController for the current request
+		abortControllerRef.current = new AbortController();
+		const signal = abortControllerRef.current.signal;
+
+		setLoading(true);
+		setError(null); // Clear previous errors
+
+		try {
+			// Call the actual async function.
+			// If the async function supports AbortSignal (e.g., fetch), pass it.
+			// You might need to adjust P to include AbortSignal if always passed.
+			// For now, assuming asyncFunction doesn't *always* take it directly
+			// and the consumer adapts or it's handled internally.
+			// A common pattern is: asyncFunction: (signal: AbortSignal, ...params: P) => Promise<T>
+			// For simplicity here, we assume if signal is needed, asyncFnRef.current will somehow get it.
+			// A more robust approach might be:
+			// const result = asyncFnRef.current(signal, ...params.slice(1));
+			// if P includes signal.
+			// OR the asyncFunction is wrapped to handle the signal internally.
+			// For direct use of fetch, a common workaround is:
+			// return fetch(url, { signal }).then(...)
+			// If the asyncFunction *is* fetch itself:
+			// const result = asyncFnRef.current(...params, { signal }); // Example if fetch is passed directly
+
+			const result = asyncFnRef.current(...params); // Assuming asyncFunction doesn't *always* need signal directly as a param
+
+			const res = await result;
+
+			// Only update state if this is the latest call and not aborted
+			if (callId === lastCallId.current && !signal.aborted) {
+				setData(res);
+				setLoading(false);
+				abortControllerRef.current = null; // Clear controller on successful completion
+			}
+			return res;
+		} catch (err: any) {
+			// Only update state if this is the latest call and not aborted
+			if (callId === lastCallId.current && !signal.aborted) {
+				// If it's an AbortError, don't set an error state, just return undefined/reject silently.
+				// This prevents showing an error when the user explicitly cancelled.
+				if (err.name === "AbortError") {
+					// console.log('Request aborted gracefully.');
+					setLoading(false); // Still stop loading
+					abortControllerRef.current = null;
+					return undefined; // Or throw a specific cancellation error
+				}
+
+				setError(err);
+				setLoading(false);
+				abortControllerRef.current = null; // Clear controller on error
+			}
+			return Promise.reject(err); // Re-throw for downstream error handling
+		}
+	}, []); // `run` is stable and relies on `asyncFnRef.current`
+
+	const reset = useCallback()(() => {
+		setLoading(false);
+		setData(null);
+		setError(null);
+		lastCallId.current = 0;
+		// Abort any ongoing request when resetting
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort();
+			abortControllerRef.current = null;
+		}
+	}, []);
+
+	// Effect for immediate execution and cleanup on unmount
+	useEffect()(() => {
+		if (immediate) {
+			// Provide initialParams if they exist, otherwise an empty array (needs type assertion)
+			// Ensure initialParams are stable if they are objects/arrays
+			run(...(initialParams || ([] as unknown as P)));
+		}
+
+		// Cleanup function: abort any ongoing request when the component unmounts
+		return () => {
+			if (abortControllerRef.current) {
+				abortControllerRef.current.abort();
+				abortControllerRef.current = null;
+			}
+		};
+	}, [immediate, run, initialParams]); // initialParams should be stable (memoized by consumer)
+
+	return { loading, data, error, run, reset };
 }
 
 // setInterval 管理

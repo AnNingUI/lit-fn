@@ -2,6 +2,7 @@ import { hooksAdapter } from "@/_adaper";
 import {
 	currentContainer,
 	EventBus,
+	UseAsyncReturn,
 	type Context as Ctx,
 	type EffectFn as effn,
 } from "../core";
@@ -77,6 +78,13 @@ export interface HooksAdapterInterface {
 	// ==== async ====
 	useTimeout(fn: () => void, delay: number): void;
 	useInterval(fn: () => void, interval: number): void;
+	useAsync<T = any, P extends any[] = any[]>(
+		asyncFunction: (...params: P) => Promise<T>,
+		option: {
+			immediate?: boolean;
+			initialParams?: P;
+		}
+	): UseAsyncReturn<T, P>;
 	useDebounce<T>(value: T, wait: number): T;
 	useThrottle<T>(value: T, limit: number): T;
 	useDebounceFn<T extends (...args: any[]) => any>(
