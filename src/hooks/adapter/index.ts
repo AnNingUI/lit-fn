@@ -1,4 +1,5 @@
 import { hooksAdapter } from "@/_adaper";
+import { ContextProxy } from "../context";
 import {
 	currentContainer,
 	EventBus,
@@ -31,7 +32,7 @@ export interface HooksAdapterInterface {
 	useCallback<T extends (...args: any[]) => any>(fn: T, deps?: any[]): T;
 	useMemoizedFn<T extends (...args: any[]) => any>(fn: T): T;
 	// ==== Context ====
-	createContext<T>(defaultValue: T): Context<T>;
+	createContext<T>(defaultValue: T, proxy?: ContextProxy<T>): Context<T>;
 	useContext<T>(context: Context<T>): T;
 	useEventBus<Payload = any>(): EventBus<Payload>;
 	useEmitter<Payload = any>(

@@ -117,6 +117,23 @@ function getLitStaticStyles(
 }
 
 // ---------------------------
+// Global CSS
+// ---------------------------
+let globalCSS: CSSResult[] | undefined;
+export function initGlobalCSS(css: CSSResult | CSSResult[]) {
+	globalCSS = Array.isArray(css) ? css : [css];
+}
+
+export function injectGlobalCSS(css: CSSResult | CSSResult[]) {
+	if (!globalCSS) return;
+	if (Array.isArray(css)) {
+		globalCSS.push(...css);
+	} else {
+		globalCSS.push(css);
+	}
+}
+
+// ---------------------------
 // Main Component Definition Logic
 // ---------------------------
 export function defineComponent<T, Name extends string>(
@@ -133,15 +150,22 @@ export function defineComponent<T, Name extends string>(
 
 	const observedProps = options?.props || [];
 	const staticProps = getLitStaticProperties(observedProps);
-	const combinedStyles = getLitStaticStyles(options?.style);
+	const _combinedStyles = getLitStaticStyles(options?.style);
+	const combinedStyles = _combinedStyles
+		? Array.isArray(_combinedStyles)
+			? _combinedStyles
+			: [_combinedStyles]
+		: [css``];
 	const BaseClass = options?.mixinFn ? options.mixinFn(LitElement) : LitElement;
-
+	const withGlobalStyles = globalCSS
+		? [...globalCSS, ...combinedStyles]
+		: combinedStyles;
 	class FunctionElement
 		extends BaseClass
 		implements ComponentClass<T>, ComponentContext<T>
 	{
 		static properties = staticProps;
-		static styles = combinedStyles;
+		static styles = withGlobalStyles;
 
 		private hookContainer: HookContainer;
 		private templates: Record<string, HTMLTemplateElement> = {};
