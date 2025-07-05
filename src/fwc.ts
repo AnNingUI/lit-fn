@@ -21,6 +21,10 @@ export type HookContainer = {
 };
 export let currentContainer: HookContainer | null = null;
 
+export let renderNow = {
+	component: () => null as any as LitElement,
+};
+
 export function injectRerender(fn: () => void) {
 	if (currentContainer) {
 		currentContainer.rerender = fn;
@@ -65,7 +69,7 @@ type TagOptions<T extends string> = {
 	extends?: keyof HTMLElementTagNameMap; // Changed to optional as per usage
 };
 
-export interface ComponentClass<T> {
+export interface ComponentClass<T> extends LitElement {
 	get tag(): string;
 	get props(): T;
 }
@@ -124,15 +128,16 @@ export function initGlobalCSS(css: CSSResult | CSSResult[]) {
 	globalCSS = Array.isArray(css) ? css : [css];
 }
 
-export function injectGlobalCSS(css: CSSResult | CSSResult[]) {
-	if (!globalCSS) return;
-	if (Array.isArray(css)) {
-		globalCSS.push(...css);
-	} else {
-		globalCSS.push(css);
-	}
+function getGlobalCSS() {
+	return globalCSS;
 }
 
+function lazyGetGlobalCSS() {
+	if (!globalCSS) return () => getGlobalCSS();
+	else return () => globalCSS;
+}
+type FnComponent<T> = new () => (ComponentClass<T> & LitElement & T) &
+	CustomElementConstructor;
 // ---------------------------
 // Main Component Definition Logic
 // ---------------------------
@@ -140,12 +145,11 @@ export function defineComponent<T, Name extends string>(
 	tag: LowercaseDashString<Name> | TagOptions<Name>,
 	component: ComponentFn<T>,
 	options?: ComponentOptions<T>
-): ComponentClass<T> & LitElement {
+): FnComponent<T> {
 	const tagName = normalizeTagName(tag);
-
+	const _globalCSS = lazyGetGlobalCSS();
 	if (customElements.get(tagName)) {
-		return customElements.get(tagName) as unknown as ComponentClass<T> &
-			LitElement;
+		return customElements.get(tagName) as unknown as FnComponent<T>;
 	}
 
 	const observedProps = options?.props || [];
@@ -157,15 +161,18 @@ export function defineComponent<T, Name extends string>(
 			: [_combinedStyles]
 		: [css``];
 	const BaseClass = options?.mixinFn ? options.mixinFn(LitElement) : LitElement;
-	const withGlobalStyles = globalCSS
-		? [...globalCSS, ...combinedStyles]
-		: combinedStyles;
+
+	const createCSS = () => {
+		const gcss = _globalCSS();
+		return gcss ? [...gcss!, ...combinedStyles] : combinedStyles;
+	};
+
 	class FunctionElement
 		extends BaseClass
 		implements ComponentClass<T>, ComponentContext<T>
 	{
 		static properties = staticProps;
-		static styles = withGlobalStyles;
+		static styles = createCSS();
 
 		private hookContainer: HookContainer;
 		private templates: Record<string, HTMLTemplateElement> = {};
@@ -285,7 +292,7 @@ export function defineComponent<T, Name extends string>(
 
 		protected render(): TemplateResult {
 			let tpl!: TemplateResult | (() => TemplateResult);
-
+			renderNow.component = () => this;
 			withContainer(this.hookContainer, () => {
 				resetHooks();
 				tpl = component(this.props, this as unknown as ComponentContext<T>);
@@ -323,7 +330,7 @@ export function defineComponent<T, Name extends string>(
 		customElements.define(tagName, FunctionElement);
 	}
 
-	return FunctionElement as unknown as ComponentClass<T> & LitElement;
+	return FunctionElement as unknown as FnComponent<T>;
 }
 
 export function createComponent<T>(
@@ -335,3 +342,76 @@ export function createComponent<T>(
 			defineComponent(tag, component, options),
 	};
 }
+
+// interface TobeItem {
+// 	id: number;
+// 	text: string;
+// 	done: boolean;
+// }
+
+// // useProxy 的 某个数据修改只会刷新应用了那个数据的 dom 部分，而不是全部刷新
+// const proxyData = useProxy({
+// 	count: 0,
+// 	name: "John",
+// 	todoList: [] as TobeItem[],
+// });
+
+// const add = () => {
+// 	proxyData.count++;
+// };
+
+// const sub = () => {
+// 	proxyData.count--;
+// };
+
+// const addTodo = (text: string) => {
+// 	proxyData.todoList.push({ id: Date.now(), text, done: false });
+// };
+
+// const setName = (name: string) => {
+// 	proxyData.name = name;
+// };
+
+// const CountComponent = defineComponent("count-component", () => {
+// 	return html`
+// 		<div>
+// 			<button @click=${add}>+</button>
+// 			<p>Count: ${proxyData.count}</p>
+// 			<button @click=${sub}>-</button>
+// 		</div>
+// 	`;
+// });
+
+// const NameComponent = defineComponent("name-component", () => {
+// 	return html`
+// 		<div>
+// 			<p>Name: ${proxyData.name}</p>
+// 			<input type="text" @input=${(e: InputEvent) => setName(e.target.value)} />
+// 		</div>
+// 	`;
+// });
+
+// const TodoListComponent = defineComponent("todo-list-component", () => {
+// 	return html`
+// 		<div>
+// 			<button @click=${addTodo}>Add Todo</button>
+// 			<ul>
+// 				${proxyData.todoList.map(
+// 					(todo) => html`
+// 						<li>
+// 							<input type="checkbox" @change=${() => toggleTodo(todo.id)} />
+// 							<span style=${todo.done ? "text-decoration: line-through" : ""}
+// 								>${todo.text}</span
+// 							>
+// 						</li>
+// 					`
+// 				)}
+// 			</ul>
+// 		</div>
+// 	`;
+// });
+// export const MyInput = defineComponent("my-input", () => html``);
+// /**
+//  * @element my-input
+//  */
+// export class MyInputType extends MyInput {}

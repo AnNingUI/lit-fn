@@ -1,10 +1,26 @@
-import { useState } from "@/hooks/basic";
 import { html } from "lit";
 import { createComponent } from "../fwc";
+import { count } from "./store";
 
-export const AppMain = createComponent((_, ctx) => {
+// initGlobalCSS([
+// 	css`
+// 		* {
+// 			background-color: #000000;
+// 		}
+// 	`,
+// ]);
+
+export const AppMain = createComponent(() => {
 	// 将箭头函数组件的this移动到组件实例上
-	const hc = ctx.lazy(() => hookCallback);
+	const hc = (a: number, b: number) => {
+		return html`
+			<div>${a + b}</div>
+			<div>${count.value}</div>
+			<button @click="${() => count.increment()}">+</button>
+			<button @click=${() => count.decrement()}>-</button>
+		`;
+	};
+
 	return html`
 		<main>
 			${hc(1, 2)}
@@ -12,13 +28,3 @@ export const AppMain = createComponent((_, ctx) => {
 		</main>
 	`;
 });
-
-const hookCallback = (a: number, b: number) => {
-	const [s, ss] = useState(0);
-	return html`
-		<div>${a + b}</div>
-		<div>${s}</div>
-		<button @click=${() => ss(s + 1)}>+</button>
-		<button @click=${() => ss(s - 1)}>-</button>
-	`;
-};
