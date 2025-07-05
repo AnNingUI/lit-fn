@@ -1,11 +1,12 @@
 {
 	"name": "lit-fn",
-	"version": "0.2.6",
+	"version": "0.2.8",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
 		"serve": "vite preview",
+		"test": "storybook dev -p 6006",
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build"
 	},

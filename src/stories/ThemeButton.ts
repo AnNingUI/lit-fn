@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { createContext, defineComponent, useContext, useState } from "../index";
+import { count } from "./store";
 
 const ThemeContext = createContext("light");
 
@@ -8,6 +9,7 @@ export const ThemeButton = defineComponent("theme-button", (_) => {
 
 	return ThemeContext.Provider(theme)(
 		html`
+			${count.value}
 			<button @click=${() => setTheme(theme === "light" ? "dark" : "light")}>
 				Theme: ${theme}
 			</button>
