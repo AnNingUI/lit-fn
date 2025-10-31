@@ -1,8 +1,10 @@
 import type { Meta } from "@storybook/web-components";
 import { html } from "lit";
+import "./TCounter-Proxy";
 import "./ThemeButton";
 const themeShow = () => html`
 	<main>
+		<t-counter></t-counter>
 		<theme-display></theme-display>
 		<theme-button></theme-button>
 	</main>
