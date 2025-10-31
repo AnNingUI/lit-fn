@@ -10,7 +10,11 @@ const useLayoutEffect = () =>
 	hooksAdapter.current?.useLayoutEffect ?? BuseLayoutEffect;
 // 只在挂载时调用
 export function useMount(fn: () => void): void {
-	useEffect()(fn, []);
+	useEffect()(() => {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => fn());
+		});
+	}, []);
 }
 
 // 只在卸载时调用

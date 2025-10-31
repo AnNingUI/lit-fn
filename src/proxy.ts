@@ -211,3 +211,31 @@ const defaultProxyContext = createProxyContext();
 const { createProxy, batchProxy } = createProxyReactive(defaultProxyContext);
 
 export { batchProxy, createProxy };
+
+export const proxySetCallBack = <T extends object, K extends keyof T>(
+	obj: T,
+	key: K,
+	callback: (item: T[K]) => void
+) => {
+	return () => {
+		batchProxy(() => callback(obj[key]));
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				obj[key] = obj[key];
+			});
+		});
+	};
+};
+
+type $ProxySet<T extends object, K extends keyof T> = {
+	$set: (callback: (item: T[K]) => void) => () => void;
+};
+
+export const ProxyReflect = {
+	$get<T extends object, K extends keyof T>(obj: T, key: K): $ProxySet<T, K> {
+		return {
+			$set: (callback: (item: T[K]) => void) =>
+				proxySetCallBack(obj, key, callback),
+		};
+	},
+};

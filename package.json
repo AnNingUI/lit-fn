@@ -1,49 +1,49 @@
 {
-	"name": "lit-fn",
-	"version": "0.2.8",
-	"type": "module",
-	"scripts": {
-		"dev": "vite",
-		"build": "vite build",
-		"serve": "vite preview",
-		"test": "storybook dev -p 6006",
-		"storybook": "storybook dev -p 6006",
-		"build-storybook": "storybook build"
-	},
-	"main": "dist/index.cjs.js",
-	"module": "dist/index.es.js",
-	"types": "dist/types/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/types/index.d.ts",
-			"import": "./dist/index.es.js",
-			"require": "./dist/index.cjs.js"
-		},
-		"./adaper": {
-			"types": "./dist/types/adaper.d.ts",
-			"import": "./dist/adaper.es.js",
-			"require": "./dist/adaper.cjs.js"
-		}
-	},
-	"files": [
-		"dist"
-	],
-	"dependencies": {
-		"lit": "^3.3.0",
-		"lit-fn": "file:"
-	},
-	"devDependencies": {
-		"@chromatic-com/storybook": "3",
-		"@storybook/addon-essentials": "8.6.12",
-		"@storybook/blocks": "8.6.12",
-		"@storybook/experimental-addon-test": "8.6.12",
-		"@storybook/test": "8.6.12",
-		"@storybook/web-components": "8.6.12",
-		"@storybook/web-components-vite": "8.6.12",
-		"@types/node": "^22.15.19",
-		"storybook": "8.6.12",
-		"typescript": "^5.8.3",
-		"vite": "^6.3.4",
-		"vite-plugin-dts": "^4.5.3"
-	}
+  "name": "lit-fn",
+  "version": "0.2.9",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "test": "storybook dev -p 6006",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.es.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs.js"
+    },
+    "./adaper": {
+      "types": "./dist/types/adaper.d.ts",
+      "import": "./dist/adaper.es.js",
+      "require": "./dist/adaper.cjs.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "lit": "^3.3.0",
+    "lit-fn": "file:"
+  },
+  "devDependencies": {
+    "@chromatic-com/storybook": "3",
+    "@storybook/addon-essentials": "8.6.12",
+    "@storybook/blocks": "8.6.12",
+    "@storybook/experimental-addon-test": "8.6.12",
+    "@storybook/test": "8.6.12",
+    "@storybook/web-components": "8.6.12",
+    "@storybook/web-components-vite": "8.6.12",
+    "@types/node": "^22.15.19",
+    "storybook": "8.6.12",
+    "typescript": "^5.8.3",
+    "vite": "^7.2.0-beta.1",
+    "vite-plugin-dts": "^5.0.0-beta.6"
+  }
 }
